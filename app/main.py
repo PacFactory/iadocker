@@ -7,7 +7,7 @@ import logging
 
 from app.routes import auth, search, items, downloads, settings
 
-VERSION = "0.5.2"
+VERSION = "0.6.0"
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
