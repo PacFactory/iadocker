@@ -1,15 +1,12 @@
 services:
   iadocker:
-    build: .
+    image: ghcr.io/pacfactory/iadocker:latest
     container_name: iadocker
     ports:
       - "8080:8080"
     volumes:
       - ./config:/config
       - ./data:/data
-    environment:
-      - IA_CONFIG_FILE=/config/ia.ini
-      - DOWNLOAD_DIR=/data
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/api/health"]
