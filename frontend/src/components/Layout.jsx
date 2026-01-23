@@ -1,5 +1,6 @@
 import { h } from 'preact';
-import { route } from 'preact-router';
+
+const VERSION = 'v0.2.0';
 
 // Icons
 const SearchIcon = () => (
@@ -65,6 +66,9 @@ export default function Layout({ children, url }) {
                         </a>
                     ))}
                 </nav>
+                <div class="sidebar-footer">
+                    <span class="version-badge">IADocker {VERSION}</span>
+                </div>
             </aside>
             <main class="main-content">
                 {children}
