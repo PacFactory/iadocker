@@ -36,9 +36,26 @@ export const api = {
     getItemFiles: (identifier) => request(`/items/${identifier}/files`),
 
     // Downloads
-    startDownload: (identifier, files, glob, format, destdir) => request('/downloads', {
+    startDownload: (identifier, options = {}) => request('/downloads', {
         method: 'POST',
-        body: JSON.stringify({ identifier, files, glob, format, destdir }),
+        body: JSON.stringify({
+            identifier,
+            files: options.files || null,
+            glob: options.glob || null,
+            format: options.format || null,
+            destdir: options.destdir || null,
+            // New download options
+            ignore_existing: options.ignoreExisting,
+            checksum: options.checksum,
+            retries: options.retries,
+            timeout: options.timeout,
+            no_directories: options.noDirectories,
+            no_change_timestamp: options.noChangeTimestamp,
+            source: options.source,
+            exclude_source: options.excludeSource,
+            on_the_fly: options.onTheFly,
+            exclude: options.exclude,
+        }),
     }),
     getDownloads: () => request('/downloads'),
     cancelDownload: (jobId) => request(`/downloads/${jobId}`, { method: 'DELETE' }),
@@ -50,6 +67,10 @@ export const api = {
         method: 'PUT',
         body: JSON.stringify(settings),
     }),
+    getDirectories: (path = '') => {
+        const params = path ? `?path=${encodeURIComponent(path)}` : '';
+        return request(`/settings/directories${params}`);
+    },
 };
 
 // SSE helpers

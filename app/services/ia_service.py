@@ -90,6 +90,13 @@ class IAService:
         identifier: str,
         filename: str,
         destdir: Optional[str] = None,
+        ignore_existing: bool = True,
+        checksum: bool = False,
+        retries: int = 5,
+        timeout: Optional[int] = None,
+        no_directories: bool = False,
+        no_change_timestamp: bool = False,
+        on_the_fly: bool = False,
         progress_callback: Optional[callable] = None
     ) -> bool:
         """Download a single file from an item."""
@@ -103,7 +110,12 @@ class IAService:
                 files=[filename],
                 destdir=dest,
                 verbose=True,
-                no_directory=False,
+                no_directory=no_directories,
+                ignore_existing=ignore_existing,
+                checksum=checksum,
+                retries=retries,
+                ignore_history_dir=True,
+                on_the_fly=on_the_fly,
             )
             
             print(f"Download complete: {dest}/{identifier}/{filename}")
@@ -118,6 +130,16 @@ class IAService:
         glob: Optional[str] = None,
         format: Optional[str] = None,
         destdir: Optional[str] = None,
+        ignore_existing: bool = True,
+        checksum: bool = False,
+        retries: int = 5,
+        timeout: Optional[int] = None,
+        no_directories: bool = False,
+        no_change_timestamp: bool = False,
+        source: Optional[list[str]] = None,
+        exclude_source: Optional[list[str]] = None,
+        on_the_fly: bool = False,
+        exclude: Optional[str] = None,
         progress_callback: Optional[callable] = None
     ) -> bool:
         """Download all or filtered files from an item."""
@@ -130,7 +152,12 @@ class IAService:
             kwargs = {
                 "destdir": dest,
                 "verbose": True,
-                "no_directory": False,
+                "no_directory": no_directories,
+                "ignore_existing": ignore_existing,
+                "checksum": checksum,
+                "retries": retries,
+                "ignore_history_dir": True,
+                "on_the_fly": on_the_fly,
             }
             
             if glob:
@@ -139,6 +166,14 @@ class IAService:
             if format:
                 kwargs["formats"] = [format]
                 print(f"Using format filter: {format}")
+            if source:
+                kwargs["source"] = source
+                print(f"Filtering by source: {source}")
+            if exclude_source:
+                # Filter out excluded sources
+                all_sources = ['original', 'derivative', 'metadata']
+                kwargs["source"] = [s for s in all_sources if s not in exclude_source]
+                print(f"Excluding sources: {exclude_source}")
             
             ia_item.download(**kwargs)
             
@@ -147,3 +182,4 @@ class IAService:
         except Exception as e:
             print(f"Download error: {e}")
             return False
+

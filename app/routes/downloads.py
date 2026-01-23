@@ -19,6 +19,17 @@ async def start_download(request: DownloadRequest):
         glob=request.glob,
         format=request.format,
         destdir=request.destdir,
+        # New download options
+        ignore_existing=request.ignore_existing,
+        checksum=request.checksum,
+        retries=request.retries,
+        timeout=request.timeout,
+        no_directories=request.no_directories,
+        no_change_timestamp=request.no_change_timestamp,
+        source=request.source,
+        exclude_source=request.exclude_source,
+        on_the_fly=request.on_the_fly,
+        exclude=request.exclude,
     )
     return job
 

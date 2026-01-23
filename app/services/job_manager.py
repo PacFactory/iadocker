@@ -71,12 +71,41 @@ class JobManager:
         glob: Optional[str] = None,
         format: Optional[str] = None,
         destdir: Optional[str] = None,
+        # New download options
+        ignore_existing: Optional[bool] = None,
+        checksum: Optional[bool] = None,
+        retries: Optional[int] = None,
+        timeout: Optional[int] = None,
+        no_directories: Optional[bool] = None,
+        no_change_timestamp: Optional[bool] = None,
+        source: Optional[list[str]] = None,
+        exclude_source: Optional[list[str]] = None,
+        on_the_fly: Optional[bool] = None,
+        exclude: Optional[str] = None,
     ) -> Job:
         """Create a new download job."""
         job_id = str(uuid.uuid4())[:8]
         
         # Validate and resolve destdir
         validated_destdir = self._validate_destdir(destdir)
+        
+        # Load global settings defaults
+        from app.routes.settings import load_settings
+        defaults = load_settings()
+        
+        # Merge options with defaults (per-download overrides settings)
+        download_options = {
+            "ignore_existing": ignore_existing if ignore_existing is not None else defaults.get("ignore_existing", True),
+            "checksum": checksum if checksum is not None else defaults.get("checksum", False),
+            "retries": retries if retries is not None else defaults.get("retries", 5),
+            "timeout": timeout if timeout is not None else defaults.get("timeout"),
+            "no_directories": no_directories if no_directories is not None else True,
+            "no_change_timestamp": no_change_timestamp if no_change_timestamp is not None else defaults.get("no_change_timestamp", False),
+            "source": source,
+            "exclude_source": exclude_source,
+            "on_the_fly": on_the_fly if on_the_fly is not None else defaults.get("on_the_fly", False),
+            "exclude": exclude,
+        }
         
         job = Job(
             id=job_id,
@@ -94,7 +123,7 @@ class JobManager:
         await self._notify_download_progress(job)
         
         # Start processing in background
-        asyncio.create_task(self._process_download(job, files, glob, format))
+        asyncio.create_task(self._process_download(job, files, glob, format, download_options))
         
         return job
     
@@ -104,10 +133,11 @@ class JobManager:
         files: Optional[list[str]],
         glob: Optional[str],
         format: Optional[str],
+        download_options: dict,
     ):
+        """Process a download job."""
         # Use custom destdir if set, otherwise default
         destdir = job.destdir
-        """Process a download job."""
         job_id = job.id
         
         # Wait if at max concurrent downloads
@@ -144,6 +174,13 @@ class JobManager:
                             job.identifier,
                             f,
                             destdir=destdir,
+                            ignore_existing=download_options.get("ignore_existing", True),
+                            checksum=download_options.get("checksum", False),
+                            retries=download_options.get("retries", 5),
+                            timeout=download_options.get("timeout"),
+                            no_directories=download_options.get("no_directories", False),
+                            no_change_timestamp=download_options.get("no_change_timestamp", False),
+                            on_the_fly=download_options.get("on_the_fly", False),
                         )
                     )
                     if not success:
@@ -156,6 +193,16 @@ class JobManager:
                         glob=glob,
                         format=format,
                         destdir=destdir,
+                        ignore_existing=download_options.get("ignore_existing", True),
+                        checksum=download_options.get("checksum", False),
+                        retries=download_options.get("retries", 5),
+                        timeout=download_options.get("timeout"),
+                        no_directories=download_options.get("no_directories", False),
+                        no_change_timestamp=download_options.get("no_change_timestamp", False),
+                        source=download_options.get("source"),
+                        exclude_source=download_options.get("exclude_source"),
+                        on_the_fly=download_options.get("on_the_fly", False),
+                        exclude=download_options.get("exclude"),
                     )
                 )
                 if not success:

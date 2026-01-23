@@ -1,6 +1,7 @@
-import { h } from 'preact';
+import { Match } from 'preact-router/match';
 
-const VERSION = 'v0.6.0';
+// Version injected by Vite from .version file
+const VERSION = `v${__APP_VERSION__}`;
 
 // Icons
 const SearchIcon = () => (
@@ -33,17 +34,22 @@ const ArchiveLogo = () => (
     </svg>
 );
 
-export default function Layout({ children, url }) {
+// Custom active state logic:
+// - Search tab: active on /, /search, /item/*
+// - Other tabs: prefix match
+const isActive = (path, url) => {
+    if (path === '/') {
+        return url === '/' || url === '/search' || url?.startsWith('/item/');
+    }
+    return url?.startsWith(path);
+};
+
+export default function Layout({ children }) {
     const navItems = [
         { path: '/', icon: SearchIcon, label: 'Search' },
         { path: '/downloads', icon: DownloadIcon, label: 'Downloads' },
         { path: '/settings', icon: SettingsIcon, label: 'Settings' },
     ];
-
-    const isActive = (path) => {
-        if (path === '/') return url === '/' || url === '/search' || url?.startsWith('/item/');
-        return url?.startsWith(path);
-    };
 
     return (
         <div class="layout">
@@ -55,16 +61,18 @@ export default function Layout({ children, url }) {
                     </div>
                 </div>
                 <nav class="sidebar-nav">
-                    {navItems.map(item => (
-                        <a
-                            key={item.path}
-                            class={`nav-item ${isActive(item.path) ? 'active' : ''}`}
-                            href={item.path}
-                        >
-                            <item.icon />
-                            <span>{item.label}</span>
-                        </a>
-                    ))}
+                    <Match>
+                        {({ url }) => navItems.map(item => (
+                            <a
+                                key={item.path}
+                                class={`nav-item ${isActive(item.path, url) ? 'active' : ''}`}
+                                href={item.path}
+                            >
+                                <item.icon />
+                                <span>{item.label}</span>
+                            </a>
+                        ))}
+                    </Match>
                 </nav>
                 <div class="sidebar-footer">
                     <span class="version-badge">IADocker {VERSION}</span>

@@ -108,6 +108,30 @@ class DownloadRequest(BaseModel):
     glob: Optional[str] = None
     format: Optional[str] = None
     destdir: Optional[str] = None  # Custom destination path within /data volume
+    
+    # Skip/resume options
+    ignore_existing: Optional[bool] = None  # Skip files already downloaded
+    checksum: Optional[bool] = None  # Skip files based on checksum verification
+    
+    # Retry and timeout
+    retries: Optional[int] = None  # Number of retries (default: 5)
+    timeout: Optional[int] = None  # Download timeout in seconds
+    
+    # Directory structure
+    no_directories: Optional[bool] = None  # Download into working dir without item folder
+    
+    # Timestamp behavior
+    no_change_timestamp: Optional[bool] = None  # Don't change timestamp to match source
+    
+    # Source filtering
+    source: Optional[list[str]] = None  # Filter by source (original, derivative, metadata)
+    exclude_source: Optional[list[str]] = None  # Exclude by source
+    
+    # On-the-fly derivatives
+    on_the_fly: Optional[bool] = None  # Include EPUB, MOBI, DAISY derivatives
+    
+    # Additional filtering
+    exclude: Optional[str] = None  # Exclude files matching glob pattern
 
 
 class UploadRequest(BaseModel):

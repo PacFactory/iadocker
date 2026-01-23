@@ -7,7 +7,19 @@ import logging
 
 from app.routes import auth, search, items, downloads, settings
 
-VERSION = "0.6.0"
+# Read version from .version file (single source of truth)
+def _read_version():
+    """Read version from .version file."""
+    version_paths = [
+        Path(__file__).parent.parent / ".version",  # /app/.version in Docker
+        Path(__file__).parent.parent.parent / ".version",  # project root in dev
+    ]
+    for vpath in version_paths:
+        if vpath.exists():
+            return vpath.read_text().strip()
+    return "0.0.0"  # fallback
+
+VERSION = _read_version()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 

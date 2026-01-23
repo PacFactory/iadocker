@@ -39,6 +39,14 @@ export default function Settings() {
     const [maxConcurrent, setMaxConcurrent] = useState(3);
     const [savingSettings, setSavingSettings] = useState(false);
 
+    // Download behavior defaults
+    const [ignoreExisting, setIgnoreExisting] = useState(true);
+    const [checksum, setChecksum] = useState(false);
+    const [retries, setRetries] = useState(5);
+    const [timeout, setTimeout] = useState(null);
+    const [noChangeTimestamp, setNoChangeTimestamp] = useState(false);
+    const [onTheFly, setOnTheFly] = useState(false);
+
     const loadStatus = async () => {
         setLoading(true);
         setMessage(null);
@@ -52,6 +60,12 @@ export default function Settings() {
             try {
                 const settings = await api.getSettings();
                 setMaxConcurrent(settings.max_concurrent_downloads);
+                setIgnoreExisting(settings.ignore_existing ?? true);
+                setChecksum(settings.checksum ?? false);
+                setRetries(settings.retries ?? 5);
+                setTimeout(settings.timeout ?? null);
+                setNoChangeTimestamp(settings.no_change_timestamp ?? false);
+                setOnTheFly(settings.on_the_fly ?? false);
             } catch (e) {
                 console.error('Failed to load settings:', e);
             }
@@ -262,60 +276,122 @@ export default function Settings() {
             </div>
 
             {/* Info cards */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 'var(--space-lg)', marginTop: 'var(--space-lg)' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 'var(--space-lg)', marginTop: 'var(--space-lg)' }}>
                 <div class="card">
                     <div class="card-header">⚙️ Download Settings</div>
                     <div class="card-body">
+                        {/* Concurrent Downloads */}
                         <div class="form-group">
                             <label class="form-label">Max Concurrent Downloads</label>
-                            <div style={{ display: 'flex', gap: 'var(--space-sm)', alignItems: 'center' }}>
-                                <input
-                                    type="number"
-                                    class="form-input"
-                                    value={maxConcurrent}
-                                    min="1"
-                                    max="10"
-                                    style={{ width: '80px' }}
-                                    onInput={(e) => setMaxConcurrent(parseInt(e.target.value) || 1)}
-                                />
-                                <button
-                                    class="btn btn-primary"
-                                    disabled={savingSettings}
-                                    onClick={async () => {
-                                        setSavingSettings(true);
-                                        try {
-                                            await api.updateSettings({ max_concurrent_downloads: maxConcurrent });
-                                            setMessage({ type: 'success', text: 'Settings saved!' });
-                                        } catch (e) {
-                                            setMessage({ type: 'error', text: 'Failed to save settings' });
-                                        }
-                                        setSavingSettings(false);
-                                    }}
-                                >
-                                    {savingSettings ? 'Saving...' : 'Save'}
-                                </button>
-                            </div>
-                            <p class="text-secondary" style={{ fontSize: '0.8rem', marginTop: 'var(--space-sm)' }}>
-                                Number of files to download simultaneously (1-10)
+                            <input
+                                type="number"
+                                class="form-input"
+                                value={maxConcurrent}
+                                min="1"
+                                max="10"
+                                style={{ width: '100px' }}
+                                onInput={(e) => setMaxConcurrent(parseInt(e.target.value) || 1)}
+                            />
+                            <p class="text-secondary" style={{ fontSize: '0.8rem', marginTop: '4px' }}>
+                                Simultaneous downloads (1-10)
                             </p>
                         </div>
+
+                        {/* Retries */}
+                        <div class="form-group">
+                            <label class="form-label">Retry Attempts</label>
+                            <input
+                                type="number"
+                                class="form-input"
+                                value={retries}
+                                min="0"
+                                max="20"
+                                style={{ width: '100px' }}
+                                onInput={(e) => setRetries(parseInt(e.target.value) || 5)}
+                            />
+                            <p class="text-secondary" style={{ fontSize: '0.8rem', marginTop: '4px' }}>
+                                Retries for failed downloads
+                            </p>
+                        </div>
+
+                        {/* Behavior Toggles */}
+                        <div class="form-group" style={{ borderTop: '1px solid var(--color-border)', paddingTop: 'var(--space-md)' }}>
+                            <label class="form-label">Default Behavior</label>
+
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: 'var(--space-sm)', cursor: 'pointer' }}>
+                                <input
+                                    type="checkbox"
+                                    checked={ignoreExisting}
+                                    onChange={(e) => setIgnoreExisting(e.target.checked)}
+                                />
+                                <span>Skip existing files</span>
+                            </label>
+
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: 'var(--space-sm)', cursor: 'pointer' }}>
+                                <input
+                                    type="checkbox"
+                                    checked={checksum}
+                                    onChange={(e) => setChecksum(e.target.checked)}
+                                />
+                                <span>Verify checksums</span>
+                            </label>
+
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: 'var(--space-sm)', cursor: 'pointer' }}>
+                                <input
+                                    type="checkbox"
+                                    checked={noChangeTimestamp}
+                                    onChange={(e) => setNoChangeTimestamp(e.target.checked)}
+                                />
+                                <span>Preserve local timestamps</span>
+                            </label>
+
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: 'var(--space-md)', cursor: 'pointer' }}>
+                                <input
+                                    type="checkbox"
+                                    checked={onTheFly}
+                                    onChange={(e) => setOnTheFly(e.target.checked)}
+                                />
+                                <span>Include derivative formats (EPUB, MOBI, DAISY)</span>
+                            </label>
+                        </div>
+
+                        {/* Save Button */}
+                        <button
+                            class="btn btn-primary"
+                            disabled={savingSettings}
+                            style={{ width: '100%' }}
+                            onClick={async () => {
+                                setSavingSettings(true);
+                                try {
+                                    await api.updateSettings({
+                                        max_concurrent_downloads: maxConcurrent,
+                                        ignore_existing: ignoreExisting,
+                                        checksum: checksum,
+                                        retries: retries,
+                                        timeout: timeout,
+                                        no_change_timestamp: noChangeTimestamp,
+                                        on_the_fly: onTheFly,
+                                    });
+                                    setMessage({ type: 'success', text: 'Settings saved!' });
+                                } catch (e) {
+                                    setMessage({ type: 'error', text: 'Failed to save settings' });
+                                }
+                                setSavingSettings(false);
+                            }}
+                        >
+                            {savingSettings ? 'Saving...' : 'Save Download Settings'}
+                        </button>
                     </div>
                 </div>
 
                 <div class="card">
-                    <div class="card-header">📥 Downloads</div>
+                    <div class="card-header">📁 Storage</div>
                     <div class="card-body">
-                        <p class="text-secondary">
+                        <p class="text-secondary" style={{ marginBottom: 'var(--space-md)' }}>
                             Downloads are saved to the <code>/data</code> volume, which maps to your local <code>./data</code> directory.
                         </p>
-                    </div>
-                </div>
-
-                <div class="card">
-                    <div class="card-header">🔐 Configuration</div>
-                    <div class="card-body">
                         <p class="text-secondary">
-                            Credentials are stored in <code>/config/ia.ini</code>. This file persists across container restarts.
+                            Credentials are stored in <code>/config/ia.ini</code> and persist across container restarts.
                         </p>
                     </div>
                 </div>
@@ -323,3 +399,4 @@ export default function Settings() {
         </div>
     );
 }
+

@@ -138,6 +138,7 @@ export default function Search() {
     const [showBulkMode, setShowBulkMode] = useState(false);
     const [bulkUrls, setBulkUrls] = useState('');
     const [downloading, setDownloading] = useState(false);
+    const [downloadProgress, setDownloadProgress] = useState('');
 
     // Filters
     const [mediatype, setMediatype] = useState('');

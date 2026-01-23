@@ -86,61 +86,173 @@ function getFileGroup(ext) {
 // Download Modal Component
 function DownloadModal({ isOpen, onClose, onConfirm, identifier, filename, fileCount }) {
     const [destdir, setDestdir] = useState('');
+    const [ignoreExisting, setIgnoreExisting] = useState(true);
+    const [checksum, setChecksum] = useState(false);
+    const [noDirectories, setNoDirectories] = useState(true);
+    const [sourceFilter, setSourceFilter] = useState('');
+
+    // Directory browser state
+    const [showBrowser, setShowBrowser] = useState(false);
+    const [browsePath, setBrowsePath] = useState('');
+    const [directories, setDirectories] = useState([]);
+    const [loadingDirs, setLoadingDirs] = useState(false);
+
+    // Load last used path from server on mount
+    useEffect(() => {
+        if (isOpen) {
+            api.getSettings().then(settings => {
+                if (settings.last_destdir) {
+                    setDestdir(settings.last_destdir);
+                }
+            }).catch(() => { });
+        }
+    }, [isOpen]);
+
+    // Load directories when browser is opened or path changes
+    useEffect(() => {
+        if (showBrowser) {
+            setLoadingDirs(true);
+            api.getDirectories(browsePath)
+                .then(data => setDirectories(data.directories || []))
+                .catch(() => setDirectories([]))
+                .finally(() => setLoadingDirs(false));
+        }
+    }, [showBrowser, browsePath]);
 
     if (!isOpen) return null;
 
     const handleConfirm = () => {
-        onConfirm(destdir.trim() || null);
-        setDestdir('');
+        const options = {
+            destdir: destdir.trim() || null,
+            ignoreExisting,
+            checksum,
+            noDirectories,
+        };
+        if (sourceFilter) {
+            options.source = [sourceFilter];
+        }
+        // Save last used path to server
+        if (destdir.trim()) {
+            api.updateSettings({ last_destdir: destdir.trim() }).catch(() => { });
+        }
+        onConfirm(options);
+        setShowBrowser(false);
     };
 
     const handleClose = () => {
-        setDestdir('');
+        setShowBrowser(false);
         onClose();
     };
 
+    const selectDirectory = (dir) => {
+        const newPath = browsePath ? `${browsePath}/${dir}` : dir;
+        setDestdir(newPath);
+        setBrowsePath(newPath);
+    };
+
     const displayName = filename || `${fileCount} files`;
-    const defaultPath = `/data/${identifier}/`;
-    const customPath = destdir ? `/data/${destdir.replace(/^\/+/, '')}/${identifier}/` : defaultPath;
+    const customPath = destdir ? `/data/${destdir.replace(/^\/+/, '')}/` : `/data/`;
 
     return (
         <div class="modal-overlay" onClick={handleClose}>
-            <div class="modal-content" onClick={e => e.stopPropagation()}>
+            <div class="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '520px' }}>
                 <div class="modal-header">
-                    <h3 style={{ margin: 0 }}>📥 Download Location</h3>
+                    <h3 style={{ margin: 0 }}>📥 Download Options</h3>
                 </div>
                 <div class="modal-body">
                     <p style={{ marginBottom: 'var(--space-md)', color: 'var(--color-text-secondary)' }}>
-                        Downloading: <strong>{displayName}</strong>
+                        Downloading: <strong>{displayName}</strong> from <code>{identifier}</code>
                     </p>
 
-                    <label class="form-label">
-                        <FolderIcon /> Custom Path (optional)
-                    </label>
-                    <input
-                        type="text"
-                        class="form-input"
-                        placeholder="e.g., games/roms or leave empty for default"
-                        value={destdir}
-                        onInput={(e) => setDestdir(e.target.value)}
-                        style={{ marginBottom: 'var(--space-sm)' }}
-                    />
-                    <p class="text-secondary" style={{ fontSize: '0.8rem', marginBottom: 'var(--space-md)' }}>
+                    {/* Destination Path */}
+                    <label class="form-label"><FolderIcon /> Download Location</label>
+                    <div style={{ display: 'flex', gap: '8px', marginBottom: '4px' }}>
+                        <input
+                            type="text"
+                            class="form-input"
+                            placeholder="Leave empty for /data root"
+                            value={destdir}
+                            onInput={(e) => setDestdir(e.target.value)}
+                            style={{ flex: 1, margin: 0 }}
+                        />
+                        <button
+                            class="btn btn-secondary"
+                            onClick={() => setShowBrowser(!showBrowser)}
+                            title="Browse directories"
+                            style={{ padding: '8px 12px' }}
+                        >📁</button>
+                    </div>
+
+                    {/* Directory Browser */}
+                    {showBrowser && (
+                        <div style={{
+                            border: '1px solid var(--color-border)',
+                            borderRadius: 'var(--radius-md)',
+                            marginBottom: 'var(--space-sm)',
+                            background: 'var(--color-bg-secondary)',
+                            maxHeight: '150px',
+                            overflow: 'auto'
+                        }}>
+                            <div style={{ padding: '6px 10px', borderBottom: '1px solid var(--color-border)', fontSize: '0.8rem', display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                                <button onClick={() => setBrowsePath('')} class="btn btn-secondary" style={{ padding: '2px 6px', fontSize: '0.75rem' }}>/data</button>
+                                {browsePath && browsePath.split('/').map((part, i, arr) => (
+                                    <span key={i}>
+                                        <span style={{ opacity: 0.5 }}>/</span>
+                                        <button onClick={() => setBrowsePath(arr.slice(0, i + 1).join('/'))} class="btn btn-secondary" style={{ padding: '2px 6px', fontSize: '0.75rem' }}>{part}</button>
+                                    </span>
+                                ))}
+                            </div>
+                            <div style={{ padding: '4px' }}>
+                                {loadingDirs ? (
+                                    <div style={{ padding: '8px', opacity: 0.6, fontSize: '0.8rem' }}>Loading...</div>
+                                ) : directories.length === 0 ? (
+                                    <div style={{ padding: '8px', opacity: 0.6, fontSize: '0.8rem' }}>No subdirectories</div>
+                                ) : directories.map(dir => (
+                                    <button key={dir} onClick={() => selectDirectory(dir)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '6px 10px', border: 'none', background: 'transparent', cursor: 'pointer', borderRadius: 'var(--radius-sm)', fontSize: '0.85rem', color: 'var(--color-text)' }}>📁 {dir}</button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    <p class="text-secondary" style={{ fontSize: '0.8rem', marginBottom: 'var(--space-lg)' }}>
                         Files will be saved to: <code>{customPath}</code>
                     </p>
+
+                    {/* Download Options */}
+                    <div style={{ borderTop: '1px solid var(--color-border)', paddingTop: 'var(--space-md)', marginBottom: 'var(--space-md)' }}>
+                        <label class="form-label" style={{ marginBottom: 'var(--space-sm)' }}>Options (override global defaults)</label>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: 'var(--space-sm)', cursor: 'pointer' }}>
+                            <input type="checkbox" checked={ignoreExisting} onChange={(e) => setIgnoreExisting(e.target.checked)} />
+                            <span>Skip existing files</span>
+                        </label>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: 'var(--space-sm)', cursor: 'pointer' }}>
+                            <input type="checkbox" checked={checksum} onChange={(e) => setChecksum(e.target.checked)} />
+                            <span>Verify checksums</span>
+                        </label>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: 'var(--space-md)', cursor: 'pointer' }}>
+                            <input type="checkbox" checked={noDirectories} onChange={(e) => setNoDirectories(e.target.checked)} />
+                            <span>Flatten directory structure</span>
+                        </label>
+                    </div>
+
+                    {/* Source Filter */}
+                    <label class="form-label">Source Filter (optional)</label>
+                    <select class="form-input" value={sourceFilter} onChange={(e) => setSourceFilter(e.target.value)} style={{ marginBottom: 0 }}>
+                        <option value="">All sources</option>
+                        <option value="original">Original files only</option>
+                        <option value="derivative">Derivatives only</option>
+                        <option value="metadata">Metadata only</option>
+                    </select>
                 </div>
                 <div class="modal-footer">
-                    <button class="btn btn-secondary" onClick={handleClose}>
-                        Cancel
-                    </button>
-                    <button class="btn btn-primary" onClick={handleConfirm}>
-                        <DownloadIcon /> Start Download
-                    </button>
+                    <button class="btn btn-secondary" onClick={handleClose}>Cancel</button>
+                    <button class="btn btn-primary" onClick={handleConfirm}><DownloadIcon /> Start Download</button>
                 </div>
             </div>
         </div>
     );
 }
+
 
 export default function Item({ identifier }) {
     const { addToast } = useToast();
@@ -215,7 +327,7 @@ export default function Item({ identifier }) {
     };
 
     // Execute download after modal confirmation
-    const executeDownload = async (destdir) => {
+    const executeDownload = async (options) => {
         if (!pendingDownload) return;
 
         const { type, files, filename } = pendingDownload;
@@ -225,7 +337,10 @@ export default function Item({ identifier }) {
         setDownloading(prev => ({ ...prev, [downloadKey]: true }));
 
         try {
-            await api.startDownload(identifier, files, null, null, destdir);
+            await api.startDownload(identifier, {
+                files,
+                ...options,
+            });
             const message = filename
                 ? `📥 Added ${filename} to queue`
                 : type === 'all'

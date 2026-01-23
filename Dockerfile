@@ -64,6 +64,9 @@ COPY --from=backend /usr/local/bin /usr/local/bin
 # Copy application code (app/ goes to /app/app/)
 COPY --from=backend /app/app /app/app
 
+# Copy version file (single source of truth)
+COPY .version /app/.version
+
 # Copy built frontend to static directory (at /app/static, not /app/app/static)
 COPY --from=frontend /frontend/dist /app/static
 
