@@ -20,6 +20,25 @@ class JobManager:
         self._cancelled: set[str] = set()
         self._ia_service = IAService()
         self._lock = asyncio.Lock()
+        self._max_concurrent_downloads = self._load_max_concurrent()
+    
+    def _load_max_concurrent(self) -> int:
+        """Load max concurrent downloads from settings file."""
+        import json
+        from pathlib import Path
+        settings_file = Path("/config/settings.json")
+        if settings_file.exists():
+            try:
+                with open(settings_file, "r") as f:
+                    data = json.load(f)
+                    return data.get("max_concurrent_downloads", settings.max_concurrent_downloads)
+            except:
+                pass
+        return settings.max_concurrent_downloads
+    
+    def set_max_concurrent_downloads(self, value: int):
+        """Update max concurrent downloads at runtime."""
+        self._max_concurrent_downloads = max(1, min(10, value))  # Clamp 1-10
     
     async def create_download_job(
         self,
@@ -61,7 +80,7 @@ class JobManager:
         job_id = job.id
         
         # Wait if at max concurrent downloads
-        while len(self._running_downloads) >= settings.max_concurrent_downloads:
+        while len(self._running_downloads) >= self._max_concurrent_downloads:
             await asyncio.sleep(0.5)
             if job_id in self._cancelled:
                 return

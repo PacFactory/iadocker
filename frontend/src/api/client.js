@@ -43,6 +43,13 @@ export const api = {
     getDownloads: () => request('/downloads'),
     cancelDownload: (jobId) => request(`/downloads/${jobId}`, { method: 'DELETE' }),
     clearDownloads: () => request('/downloads', { method: 'DELETE' }),
+
+    // Settings
+    getSettings: () => request('/settings'),
+    updateSettings: (settings) => request('/settings', {
+        method: 'PUT',
+        body: JSON.stringify(settings),
+    }),
 };
 
 // SSE helpers

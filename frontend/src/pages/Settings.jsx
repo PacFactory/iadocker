@@ -36,6 +36,8 @@ export default function Settings() {
     const [saving, setSaving] = useState(false);
     const [message, setMessage] = useState(null);
     const [verifying, setVerifying] = useState(false);
+    const [maxConcurrent, setMaxConcurrent] = useState(3);
+    const [savingSettings, setSavingSettings] = useState(false);
 
     const loadStatus = async () => {
         setLoading(true);
@@ -45,6 +47,13 @@ export default function Settings() {
             setStatus(data);
             if (data.email && !email) {
                 setEmail(data.email);
+            }
+            // Also load settings
+            try {
+                const settings = await api.getSettings();
+                setMaxConcurrent(settings.max_concurrent_downloads);
+            } catch (e) {
+                console.error('Failed to load settings:', e);
             }
         } catch (err) {
             console.error('Failed to load status:', err);
@@ -254,6 +263,45 @@ export default function Settings() {
 
             {/* Info cards */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 'var(--space-lg)', marginTop: 'var(--space-lg)' }}>
+                <div class="card">
+                    <div class="card-header">⚙️ Download Settings</div>
+                    <div class="card-body">
+                        <div class="form-group">
+                            <label class="form-label">Max Concurrent Downloads</label>
+                            <div style={{ display: 'flex', gap: 'var(--space-sm)', alignItems: 'center' }}>
+                                <input
+                                    type="number"
+                                    class="form-input"
+                                    value={maxConcurrent}
+                                    min="1"
+                                    max="10"
+                                    style={{ width: '80px' }}
+                                    onInput={(e) => setMaxConcurrent(parseInt(e.target.value) || 1)}
+                                />
+                                <button
+                                    class="btn btn-primary"
+                                    disabled={savingSettings}
+                                    onClick={async () => {
+                                        setSavingSettings(true);
+                                        try {
+                                            await api.updateSettings({ max_concurrent_downloads: maxConcurrent });
+                                            setMessage({ type: 'success', text: 'Settings saved!' });
+                                        } catch (e) {
+                                            setMessage({ type: 'error', text: 'Failed to save settings' });
+                                        }
+                                        setSavingSettings(false);
+                                    }}
+                                >
+                                    {savingSettings ? 'Saving...' : 'Save'}
+                                </button>
+                            </div>
+                            <p class="text-secondary" style={{ fontSize: '0.8rem', marginTop: 'var(--space-sm)' }}>
+                                Number of files to download simultaneously (1-10)
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="card">
                     <div class="card-header">📥 Downloads</div>
                     <div class="card-body">

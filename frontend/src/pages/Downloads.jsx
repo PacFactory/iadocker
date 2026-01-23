@@ -109,12 +109,28 @@ export default function Downloads() {
         j.status === 'completed' || j.status === 'failed' || j.status === 'cancelled'
     );
 
+    // Sort: running first, then pending, then completed/failed, newest first within each group
+    const statusOrder = { 'running': 0, 'pending': 1, 'completed': 2, 'failed': 3, 'cancelled': 4 };
+    const sortedJobs = [...jobs].sort((a, b) => {
+        const statusDiff = (statusOrder[a.status] || 5) - (statusOrder[b.status] || 5);
+        if (statusDiff !== 0) return statusDiff;
+        return new Date(b.created_at) - new Date(a.created_at);
+    });
+
+    const runningCount = jobs.filter(j => j.status === 'running').length;
+    const pendingCount = jobs.filter(j => j.status === 'pending').length;
+
     return (
         <div>
             <div class="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <div>
                     <h1 class="page-title">Downloads</h1>
-                    <p class="page-subtitle">Manage your download queue</p>
+                    <p class="page-subtitle">
+                        {runningCount > 0 && `${runningCount} running`}
+                        {runningCount > 0 && pendingCount > 0 && ', '}
+                        {pendingCount > 0 && `${pendingCount} pending`}
+                        {runningCount === 0 && pendingCount === 0 && 'Manage your download queue'}
+                    </p>
                 </div>
                 {hasCompletedJobs && (
                     <button class="btn btn-secondary" onClick={handleClearAll}>
@@ -127,9 +143,9 @@ export default function Downloads() {
                 <div class="loading-container">
                     <div class="loading-spinner"></div>
                 </div>
-            ) : jobs.length > 0 ? (
+            ) : sortedJobs.length > 0 ? (
                 <div class="job-list">
-                    {jobs.map(job => (
+                    {sortedJobs.map(job => (
                         <div key={job.id} class="job-item">
                             <div class="job-icon">
                                 {job.status === 'completed' ? <CheckIcon /> : <DownloadIcon />}
