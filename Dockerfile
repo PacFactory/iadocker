@@ -61,10 +61,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY --from=backend /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
 COPY --from=backend /usr/local/bin /usr/local/bin
 
-# Copy application code
-COPY --from=backend /app /app
+# Copy application code (app/ goes to /app/app/)
+COPY --from=backend /app/app /app/app
 
-# Copy built frontend to static directory
+# Copy built frontend to static directory (at /app/static, not /app/app/static)
 COPY --from=frontend /frontend/dist /app/static
 
 # Create directories for persistent data
