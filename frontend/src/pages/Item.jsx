@@ -1,6 +1,7 @@
 import { h } from 'preact';
 import { useState, useEffect, useMemo } from 'preact/hooks';
 import { api } from '../api/client';
+import { useToast } from '../components/Toast';
 
 const DownloadIcon = () => (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
@@ -77,6 +78,7 @@ function getFileGroup(ext) {
 }
 
 export default function Item({ identifier }) {
+    const { addToast } = useToast();
     const [item, setItem] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -141,9 +143,11 @@ export default function Item({ identifier }) {
         setDownloading(prev => ({ ...prev, [filename]: true }));
         try {
             await api.startDownload(identifier, [filename]);
-            window.location.href = '/downloads';
+            addToast(`📥 Added ${filename} to queue`, 'success');
+            setDownloading(prev => ({ ...prev, [filename]: false }));
         } catch (err) {
             console.error('Download failed:', err);
+            addToast('Failed to start download', 'error');
             setDownloading(prev => ({ ...prev, [filename]: false }));
         }
     };
@@ -152,9 +156,11 @@ export default function Item({ identifier }) {
         setDownloading(prev => ({ ...prev, __all__: true }));
         try {
             await api.startDownload(identifier);
-            window.location.href = '/downloads';
+            addToast(`📥 Added all files from ${identifier} to queue`, 'success');
+            setDownloading(prev => ({ ...prev, __all__: false }));
         } catch (err) {
             console.error('Download failed:', err);
+            addToast('Failed to start download', 'error');
             setDownloading(prev => ({ ...prev, __all__: false }));
         }
     };
@@ -164,9 +170,11 @@ export default function Item({ identifier }) {
         try {
             const filenames = filteredFiles.map(f => f.name);
             await api.startDownload(identifier, filenames);
-            window.location.href = '/downloads';
+            addToast(`📥 Added ${filenames.length} files to queue`, 'success');
+            setDownloading(prev => ({ ...prev, __filtered__: false }));
         } catch (err) {
             console.error('Download failed:', err);
+            addToast('Failed to start download', 'error');
             setDownloading(prev => ({ ...prev, __filtered__: false }));
         }
     };
