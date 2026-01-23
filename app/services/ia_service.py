@@ -106,19 +106,27 @@ class IAService:
             
             print(f"Downloading {identifier}/{filename} to {dest}")
             
-            ia_item.download(
-                files=[filename],
-                destdir=dest,
-                verbose=True,
-                no_directory=no_directories,
-                ignore_existing=ignore_existing,
-                checksum=checksum,
-                retries=retries,
-                ignore_history_dir=True,
-                on_the_fly=on_the_fly,
-            )
+            download_kwargs = {
+                "files": [filename],
+                "destdir": dest,
+                "verbose": True,
+                "no_directory": no_directories,
+                "ignore_existing": ignore_existing,
+                "checksum": checksum,
+                "retries": retries,
+                "ignore_history_dir": True,
+                "on_the_fly": on_the_fly,
+            }
             
-            print(f"Download complete: {dest}/{identifier}/{filename}")
+            if timeout:
+                download_kwargs["timeout"] = timeout
+            
+            ia_item.download(**download_kwargs)
+            
+            if no_directories:
+                print(f"Download complete: {dest}/{filename}")
+            else:
+                print(f"Download complete: {dest}/{identifier}/{filename}")
             return True
         except Exception as e:
             print(f"Download error: {e}")
@@ -160,6 +168,8 @@ class IAService:
                 "on_the_fly": on_the_fly,
             }
             
+            if timeout:
+                kwargs["timeout"] = timeout
             if glob:
                 kwargs["glob_pattern"] = glob
                 print(f"Using glob pattern: {glob}")
@@ -174,10 +184,16 @@ class IAService:
                 all_sources = ['original', 'derivative', 'metadata']
                 kwargs["source"] = [s for s in all_sources if s not in exclude_source]
                 print(f"Excluding sources: {exclude_source}")
+            if exclude:
+                kwargs["exclude_pattern"] = exclude
+                print(f"Excluding pattern: {exclude}")
             
             ia_item.download(**kwargs)
             
-            print(f"Download complete: {dest}/{identifier}/")
+            if no_directories:
+                print(f"Download complete: {dest}/")
+            else:
+                print(f"Download complete: {dest}/{identifier}/")
             return True
         except Exception as e:
             print(f"Download error: {e}")
