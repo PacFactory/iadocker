@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException
-from configparser import ConfigParser
+from configparser import RawConfigParser
 from pathlib import Path
 import os
 
@@ -16,7 +16,8 @@ def read_config_file():
     if not config_path.exists():
         return None
     
-    config = ConfigParser()
+    # Use RawConfigParser to avoid % interpolation issues with URL-encoded values
+    config = RawConfigParser()
     config.read(config_path)
     return config
 
