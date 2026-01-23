@@ -38,6 +38,9 @@ WORKDIR /frontend
 COPY frontend/package*.json ./
 RUN npm ci
 
+# Copy version file (needed by vite.config.js)
+COPY .version ../
+
 # Build frontend
 COPY frontend/ ./
 RUN npm run build
