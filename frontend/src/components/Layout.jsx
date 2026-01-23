@@ -66,14 +66,35 @@ export default function Layout({ children }) {
 
     // Check screen size on mount and resize
     useEffect(() => {
+        let resizeTimeoutId;
+
         const checkMobile = () => {
             setIsMobile(window.innerWidth < 1024);
         };
-        
+
+        const handleResize = () => {
+            if (resizeTimeoutId) {
+                clearTimeout(resizeTimeoutId);
+            }
+            resizeTimeoutId = setTimeout(checkMobile, 150);
+        };
+
         checkMobile();
-        window.addEventListener('resize', checkMobile);
-        return () => window.removeEventListener('resize', checkMobile);
+        window.addEventListener('resize', handleResize);
+        return () => {
+            window.removeEventListener('resize', handleResize);
+            if (resizeTimeoutId) {
+                clearTimeout(resizeTimeoutId);
+            }
+        };
     }, []);
+
+    // Ensure sidebar state is consistent when switching from mobile to desktop
+    useEffect(() => {
+        if (!isMobile) {
+            setSidebarOpen(false);
+        }
+    }, [isMobile]);
 
     const toggleSidebar = () => {
         setSidebarOpen(!sidebarOpen);

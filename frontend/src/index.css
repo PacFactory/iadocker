@@ -63,6 +63,10 @@
   --transition-fast: 150ms ease;
   --transition-normal: 250ms ease;
   --transition-slow: 400ms ease;
+
+  /* Mobile Layout */
+  --mobile-header-height: 72px;
+  --mobile-header-height-small: 64px;
 }
 
 /* ============================================
@@ -849,7 +853,7 @@ a:hover {
   .main-content {
     margin-left: 0;
     padding: var(--space-lg);
-    padding-top: 72px; /* Space for mobile menu button */
+    padding-top: var(--mobile-header-height);
   }
 
   /* Adjust toast position on mobile */
@@ -865,7 +869,7 @@ a:hover {
 @media (max-width: 767px) {
   .main-content {
     padding: var(--space-md);
-    padding-top: 72px;
+    padding-top: var(--mobile-header-height);
   }
 
   .page-header {
@@ -913,13 +917,14 @@ a:hover {
   }
 
   /* Form adjustments */
-  .btn {
+  .btn:not(.btn-icon) {
     width: 100%;
     justify-content: center;
   }
 
   .btn-icon {
     width: 44px;
+    height: 44px;
   }
 
   /* Card adjustments */
@@ -940,7 +945,7 @@ a:hover {
 
   .main-content {
     padding: var(--space-sm);
-    padding-top: 64px;
+    padding-top: var(--mobile-header-height-small);
   }
 
   .page-title {
