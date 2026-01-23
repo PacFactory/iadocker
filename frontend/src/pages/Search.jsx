@@ -174,7 +174,7 @@ export default function Search() {
                 // Direct file download
                 setDownloading(true);
                 try {
-                    await api.startDownload(parsed.identifier, [parsed.filename]);
+                    await api.startDownload(parsed.identifier, { files: [parsed.filename] });
                     addToast(`📥 Added ${parsed.filename} to queue`, 'success');
                     setDownloading(false);
                 } catch (err) {
@@ -230,7 +230,7 @@ export default function Search() {
         for (const item of parsedUrls) {
             try {
                 if (item.filename) {
-                    await api.startDownload(item.identifier, [item.filename]);
+                    await api.startDownload(item.identifier, { files: [item.filename] });
                 } else {
                     await api.startDownload(item.identifier);
                 }
@@ -256,7 +256,7 @@ export default function Search() {
                 // Start download and show toast
                 setDownloading(true);
                 try {
-                    await api.startDownload(parsed.identifier, [parsed.filename]);
+                    await api.startDownload(parsed.identifier, { files: [parsed.filename] });
                     addToast(`📥 Added ${parsed.filename} to queue`, 'success');
                     setDownloading(false);
                 } catch (err) {
@@ -372,7 +372,7 @@ export default function Search() {
                                     for (const item of parsedBulkUrls) {
                                         try {
                                             if (item.filename) {
-                                                await api.startDownload(item.identifier, [item.filename]);
+                                                await api.startDownload(item.identifier, { files: [item.filename] });
                                             } else {
                                                 await api.startDownload(item.identifier);
                                             }
