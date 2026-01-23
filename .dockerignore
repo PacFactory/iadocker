@@ -2,7 +2,6 @@
 .git/
 .gitignore
 .gitattributes
-.github/
 
 # Python
 __pycache__/
@@ -44,37 +43,15 @@ coverage/
 *.code-workspace
 .DS_Store
 
-# Node.js & Frontend
-node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-
-# Frontend build artifacts (keep dist if needed)
+# Node.js & Frontend (node_modules not needed, dist is built in Dockerfile)
 frontend/node_modules/
 frontend/.vscode/
 frontend/.idea/
 frontend/*.log
-
-# Documentation
-README.md
-CHANGELOG.md
-LICENSE
-*.md
-docs/
-
-# CI/CD
-.github/
-.gitlab-ci.yml
-.travis.yml
-.circleci/
-azure-pipelines.yml
-
-# Docker
-Dockerfile*
-docker-compose*.yml
-.dockerignore
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
 
 # Logs
 *.log
@@ -109,12 +86,6 @@ dmypy.json
 # Jupyter
 .ipynb_checkpoints
 
-# Environment files (keep template if exists)
-.env
-.env.*
-!.env.example
-!.env.template
-
 # Secrets
 secrets/
 .secrets/
@@ -130,32 +101,7 @@ secrets/
 *.db
 *.sqlite
 *.sqlite3
-data/*.db
-data/*.sqlite
-data/*.sqlite3
+data/
 
-# Build artifacts
-build/
-dist/
-*.egg-info/
-
-# Archives
-*.zip
-*.tar.gz
-*.rar
-
-# Editor configs (optional - remove if needed in container)
-.editorconfig
-.prettierrc
-.eslintrc*
-.pylintrc
-.flake8
-pyproject.toml
-setup.py
-setup.cfg
-
-# Package manager lock files (include if you want reproducible builds)
-# Uncomment the ones you want to exclude:
-# package-lock.json
-# yarn.lock
-# pnpm-lock.yaml
+# Local config (not needed in container)
+config/
