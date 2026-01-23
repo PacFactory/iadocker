@@ -199,6 +199,8 @@ a:hover {
   margin-left: 260px;
   padding: var(--space-xl);
   max-width: 1400px;
+  overflow-x: hidden;
+  min-width: 0;
 }
 
 /* ============================================
@@ -492,9 +494,8 @@ a:hover {
 
 .job-title {
   font-weight: 500;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  word-break: break-word;
+  overflow-wrap: break-word;
 }
 
 .job-subtitle {
