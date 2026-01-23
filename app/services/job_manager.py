@@ -284,12 +284,25 @@ class JobManager:
                 # Calculate current downloaded size
                 current_size = 0
                 if download_dir.exists():
-                    for root, dirs, filenames in os.walk(download_dir):
-                        for f in filenames:
-                            try:
-                                current_size += os.path.getsize(os.path.join(root, f))
-                            except:
-                                pass
+                    if files:
+                        # Only count the specific files being downloaded
+                        for filename in files:
+                            file_path = download_dir / filename
+                            if file_path.exists():
+                                try:
+                                    current_size += file_path.stat().st_size
+                                except:
+                                    pass
+                    else:
+                        # Downloading all files - count everything in identifier directory
+                        # Note: with no_directories, this counts all files which may be inaccurate
+                        # but for full-item downloads this is the best we can do
+                        for root, dirs, filenames in os.walk(download_dir):
+                            for f in filenames:
+                                try:
+                                    current_size += os.path.getsize(os.path.join(root, f))
+                                except:
+                                    pass
                 
                 current_time = time.time()
                 time_delta = current_time - last_time
