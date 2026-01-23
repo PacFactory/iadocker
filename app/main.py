@@ -47,7 +47,12 @@ app.include_router(settings.router, prefix="/api/settings", tags=["settings"])
 
 
 # Serve static files (frontend) - MUST be last
-static_path = Path(__file__).parent / "static"
+# In Docker: files are at /app/static (parent.parent of main.py)
+# In dev: files might be at app/static (relative to cwd)
+static_path = Path(__file__).parent.parent / "static"
+if not static_path.exists():
+    # Fallback for local dev
+    static_path = Path(__file__).parent / "static"
 if static_path.exists():
     # Serve index.html for SPA routes
     @app.get("/{full_path:path}")
