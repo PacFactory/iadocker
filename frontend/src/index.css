@@ -63,6 +63,10 @@
   --transition-fast: 150ms ease;
   --transition-normal: 250ms ease;
   --transition-slow: 400ms ease;
+
+  /* Mobile Layout */
+  --mobile-header-height: 72px;
+  --mobile-header-height-small: 64px;
 }
 
 /* ============================================
@@ -776,5 +780,183 @@ a:hover {
   to {
     transform: scale(1);
     opacity: 1;
+  }
+}
+
+/* ============================================
+   Mobile Responsiveness
+   ============================================ */
+
+/* Mobile menu button - hidden on desktop */
+.mobile-menu-btn {
+  display: none;
+  position: fixed;
+  top: var(--space-md);
+  left: var(--space-md);
+  z-index: 1001;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-text-primary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  align-items: center;
+  justify-content: center;
+}
+
+.mobile-menu-btn:hover {
+  background: var(--color-bg-hover);
+  border-color: var(--color-accent);
+}
+
+.mobile-menu-btn svg {
+  width: 24px;
+  height: 24px;
+}
+
+/* Sidebar overlay for mobile */
+.sidebar-overlay {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: 99;
+  animation: fadeIn 0.2s ease;
+}
+
+/* Tablet and below (< 1024px) */
+@media (max-width: 1023px) {
+  .mobile-menu-btn {
+    display: flex;
+  }
+
+  .sidebar-overlay {
+    display: block;
+  }
+
+  .sidebar {
+    transform: translateX(-100%);
+    transition: transform var(--transition-normal);
+    box-shadow: var(--shadow-lg);
+  }
+
+  .sidebar.sidebar-open {
+    transform: translateX(0);
+  }
+
+  .main-content {
+    margin-left: 0;
+    padding: var(--space-lg);
+    padding-top: var(--mobile-header-height);
+  }
+
+  /* Adjust toast position on mobile */
+  .toast-container {
+    left: var(--space-md);
+    right: var(--space-md);
+    bottom: var(--space-md);
+    max-width: none;
+  }
+}
+
+/* Mobile phones (< 768px) */
+@media (max-width: 767px) {
+  .main-content {
+    padding: var(--space-md);
+    padding-top: var(--mobile-header-height);
+  }
+
+  .page-header {
+    margin-bottom: var(--space-lg);
+  }
+
+  .page-title {
+    font-size: 1.5rem;
+  }
+
+  /* Search bar adjustments */
+  .search-bar {
+    flex-direction: column;
+    gap: var(--space-md);
+  }
+
+  /* Make cards stack on mobile */
+  .results-grid {
+    grid-template-columns: 1fr;
+    gap: var(--space-md);
+  }
+
+  /* Modal adjustments */
+  .modal-overlay {
+    padding: var(--space-md);
+    align-items: flex-end;
+  }
+
+  .modal-content {
+    max-width: none;
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+  }
+
+  /* Job list adjustments */
+  .job-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-sm);
+  }
+
+  .job-status {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  /* Form adjustments */
+  .btn:not(.btn-icon) {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .btn-icon {
+    width: 44px;
+    height: 44px;
+  }
+
+  /* Card adjustments */
+  .card-body {
+    padding: var(--space-md);
+  }
+}
+
+/* Small mobile phones (< 480px) */
+@media (max-width: 479px) {
+  :root {
+    font-size: 14px;
+  }
+
+  .sidebar {
+    width: 240px;
+  }
+
+  .main-content {
+    padding: var(--space-sm);
+    padding-top: var(--mobile-header-height-small);
+  }
+
+  .page-title {
+    font-size: 1.25rem;
+  }
+
+  .sidebar-header {
+    padding: var(--space-md);
+  }
+
+  .sidebar-logo {
+    font-size: 1.125rem;
   }
 }
