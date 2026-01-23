@@ -36,7 +36,7 @@ WORKDIR /frontend
 
 # Install dependencies first (better caching)
 COPY frontend/package*.json ./
-RUN npm ci
+RUN npm install -g npm@latest && npm ci
 
 # Copy version file (needed by vite.config.js)
 COPY .version ../
