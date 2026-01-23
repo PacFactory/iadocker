@@ -219,6 +219,16 @@ class JobManager:
         await self._notify_download_progress(job)
         return True
     
+    def clear_completed_jobs(self) -> int:
+        """Clear all completed, failed, and cancelled jobs. Returns count cleared."""
+        to_remove = [
+            job_id for job_id, job in self._jobs.items()
+            if job.status in [JobStatus.COMPLETED, JobStatus.FAILED, JobStatus.CANCELLED]
+        ]
+        for job_id in to_remove:
+            del self._jobs[job_id]
+        return len(to_remove)
+    
     def subscribe_downloads(self) -> asyncio.Queue:
         """Subscribe to download progress updates."""
         queue = asyncio.Queue()

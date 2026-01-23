@@ -68,3 +68,10 @@ async def cancel_download(job_id: str):
     if not success:
         raise HTTPException(status_code=404, detail="Job not found or already completed")
     return {"success": True, "message": "Download cancelled"}
+
+
+@router.delete("")
+async def clear_downloads():
+    """Clear all completed/failed/cancelled downloads."""
+    cleared = job_manager.clear_completed_jobs()
+    return {"success": True, "cleared": cleared}

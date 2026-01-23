@@ -42,10 +42,7 @@ export const api = {
     }),
     getDownloads: () => request('/downloads'),
     cancelDownload: (jobId) => request(`/downloads/${jobId}`, { method: 'DELETE' }),
-
-    // Uploads
-    getUploads: () => request('/uploads'),
-    cancelUpload: (jobId) => request(`/uploads/${jobId}`, { method: 'DELETE' }),
+    clearDownloads: () => request('/downloads', { method: 'DELETE' }),
 };
 
 // SSE helpers
@@ -60,13 +57,3 @@ export function subscribeToDownloads(onEvent) {
     return () => eventSource.close();
 }
 
-export function subscribeToUploads(onEvent) {
-    const eventSource = new EventSource(`${API_BASE}/uploads/events`);
-    eventSource.addEventListener('progress', (e) => {
-        onEvent(JSON.parse(e.data));
-    });
-    eventSource.onerror = () => {
-        eventSource.close();
-    };
-    return () => eventSource.close();
-}

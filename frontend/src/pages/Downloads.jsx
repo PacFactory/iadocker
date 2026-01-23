@@ -76,11 +76,34 @@ export default function Downloads() {
         return map[status] || 'status-pending';
     };
 
+    const handleClearAll = async () => {
+        try {
+            await api.clearDownloads();
+            // Remove completed/failed/cancelled from local state
+            setJobs(prevJobs => prevJobs.filter(j =>
+                j.status === 'pending' || j.status === 'running'
+            ));
+        } catch (err) {
+            console.error('Failed to clear downloads:', err);
+        }
+    };
+
+    const hasCompletedJobs = jobs.some(j =>
+        j.status === 'completed' || j.status === 'failed' || j.status === 'cancelled'
+    );
+
     return (
         <div>
-            <div class="page-header">
-                <h1 class="page-title">Downloads</h1>
-                <p class="page-subtitle">Manage your download queue</p>
+            <div class="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div>
+                    <h1 class="page-title">Downloads</h1>
+                    <p class="page-subtitle">Manage your download queue</p>
+                </div>
+                {hasCompletedJobs && (
+                    <button class="btn btn-secondary" onClick={handleClearAll}>
+                        🗑️ Clear History
+                    </button>
+                )}
             </div>
 
             {loading ? (
