@@ -7,7 +7,6 @@ import Layout from './components/Layout';
 import Search from './pages/Search';
 import Item from './pages/Item';
 import Downloads from './pages/Downloads';
-import Uploads from './pages/Uploads';
 import Settings from './pages/Settings';
 
 function App() {
@@ -18,7 +17,6 @@ function App() {
                 <Search path="/search" />
                 <Item path="/item/:identifier" />
                 <Downloads path="/downloads" />
-                <Uploads path="/uploads" />
                 <Settings path="/settings" />
             </Router>
         </Layout>

@@ -3,7 +3,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from pathlib import Path
 
-from app.routes import auth, search, items, downloads, uploads
+from app.routes import auth, search, items, downloads
 
 
 app = FastAPI(
@@ -26,7 +26,6 @@ app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
 app.include_router(search.router, prefix="/api/search", tags=["search"])
 app.include_router(items.router, prefix="/api/items", tags=["items"])
 app.include_router(downloads.router, prefix="/api/downloads", tags=["downloads"])
-app.include_router(uploads.router, prefix="/api/uploads", tags=["uploads"])
 
 
 # Serve static files (frontend)

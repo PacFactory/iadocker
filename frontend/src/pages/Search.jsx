@@ -72,14 +72,25 @@ const SORT_OPTIONS = [
     { value: '-titleSorter', label: 'Title Z-A' },
 ];
 
-// Extract identifier from archive.org URL
-function extractIdentifier(input) {
+// Extract identifier (and optional filename) from archive.org URL
+// Returns { identifier, filename } or null
+function parseArchiveUrl(input) {
     const trimmed = input.trim();
 
-    // Check if it's an archive.org URL
+    // Check for download URL with specific file: archive.org/download/identifier/path/to/file.zip
+    const downloadWithFilePattern = /archive\.org\/download\/([^\/\?\#\s]+)\/(.+?)(?:\?|#|$)/;
+    const downloadWithFileMatch = trimmed.match(downloadWithFilePattern);
+    if (downloadWithFileMatch) {
+        return {
+            identifier: downloadWithFileMatch[1],
+            filename: decodeURIComponent(downloadWithFileMatch[2])
+        };
+    }
+
+    // Check if it's an archive.org URL (identifier only)
     const urlPatterns = [
         /archive\.org\/details\/([^\/\?\#\s]+)/,
-        /archive\.org\/download\/([^\/\?\#\s]+)/,
+        /archive\.org\/download\/([^\/\?\#\s]+)\/?$/,
         /archive\.org\/metadata\/([^\/\?\#\s]+)/,
         /archive\.org\/embed\/([^\/\?\#\s]+)/,
     ];
@@ -87,17 +98,32 @@ function extractIdentifier(input) {
     for (const pattern of urlPatterns) {
         const match = trimmed.match(pattern);
         if (match) {
-            return match[1];
+            return { identifier: match[1], filename: null };
         }
     }
 
     // Check if it looks like a bare identifier (no spaces, reasonable length)
     if (/^[a-zA-Z0-9_\-\.]+$/.test(trimmed) && trimmed.length > 2 && trimmed.length < 200) {
-        // Could be an identifier - we'll try it
-        return trimmed;
+        return { identifier: trimmed, filename: null };
     }
 
     return null;
+}
+
+// Parse multiple URLs from text (one per line)
+// Returns array of { identifier, filename } objects
+function parseMultipleUrls(input) {
+    const lines = input.split(/[\n\r]+/).map(l => l.trim()).filter(l => l.length > 0);
+    const results = [];
+
+    for (const line of lines) {
+        const parsed = parseArchiveUrl(line);
+        if (parsed) {
+            results.push(parsed);
+        }
+    }
+
+    return results;
 }
 
 export default function Search() {
@@ -107,6 +133,8 @@ export default function Search() {
     const [total, setTotal] = useState(0);
     const [page, setPage] = useState(1);
     const [showFilters, setShowFilters] = useState(false);
+    const [downloading, setDownloading] = useState(false);
+    const [downloadProgress, setDownloadProgress] = useState('');
 
     // Filters
     const [mediatype, setMediatype] = useState('');
@@ -115,16 +143,40 @@ export default function Search() {
     const [year, setYear] = useState('');
     const [creator, setCreator] = useState('');
 
+    // Check if input has multiple URLs
+    const parsedUrls = query.includes('\n') || query.includes('archive.org')
+        ? parseMultipleUrls(query)
+        : [];
+    const isBulkMode = parsedUrls.length > 1;
+
     const handleSearch = async (e, newPage = 1) => {
         e?.preventDefault();
 
         const trimmedQuery = query.trim();
 
-        // Check if it's an archive.org URL or identifier
-        if (trimmedQuery && !trimmedQuery.includes(' ')) {
-            const identifier = extractIdentifier(trimmedQuery);
-            if (identifier && trimmedQuery.includes('archive.org')) {
-                route(`/item/${identifier}`);
+        // If bulk mode, handle bulk download instead
+        if (isBulkMode) {
+            await handleBulkDownload();
+            return;
+        }
+
+        // Check if it's an archive.org URL with specific file to download
+        const parsed = parseArchiveUrl(trimmedQuery);
+        if (parsed && trimmedQuery.includes('archive.org')) {
+            if (parsed.filename) {
+                // Direct file download
+                setDownloading(true);
+                try {
+                    await api.startDownload(parsed.identifier, [parsed.filename]);
+                    route('/downloads');
+                } catch (err) {
+                    console.error('Download failed:', err);
+                    setDownloading(false);
+                }
+                return;
+            } else {
+                // Just go to item page
+                route(`/item/${parsed.identifier}`);
                 return;
             }
         }
@@ -158,14 +210,53 @@ export default function Search() {
         }
     };
 
+    // Bulk download handler
+    const handleBulkDownload = async () => {
+        if (parsedUrls.length === 0) return;
+
+        setDownloading(true);
+        setDownloadProgress(`Queuing 0/${parsedUrls.length}...`);
+
+        let queued = 0;
+        for (const item of parsedUrls) {
+            try {
+                if (item.filename) {
+                    await api.startDownload(item.identifier, [item.filename]);
+                } else {
+                    await api.startDownload(item.identifier);
+                }
+                queued++;
+                setDownloadProgress(`Queuing ${queued}/${parsedUrls.length}...`);
+            } catch (err) {
+                console.error(`Failed to queue ${item.identifier}:`, err);
+            }
+        }
+
+        setDownloadProgress('');
+        setDownloading(false);
+        route('/downloads');
+    };
+
     const handleItemClick = (identifier) => {
         route(`/item/${identifier}`);
     };
 
-    const handleGoToIdentifier = () => {
-        const identifier = extractIdentifier(query.trim());
-        if (identifier) {
-            route(`/item/${identifier}`);
+    const handleGoToIdentifier = async () => {
+        const parsed = parseArchiveUrl(query.trim());
+        if (parsed) {
+            if (parsed.filename) {
+                // Start download and go to downloads page
+                setDownloading(true);
+                try {
+                    await api.startDownload(parsed.identifier, [parsed.filename]);
+                    route('/downloads');
+                } catch (err) {
+                    console.error('Download failed:', err);
+                    setDownloading(false);
+                }
+            } else {
+                route(`/item/${parsed.identifier}`);
+            }
         }
     };
 
@@ -225,27 +316,68 @@ export default function Search() {
                 </button>
             </form>
 
-            {/* Quick access - Go to identifier */}
-            {query.trim() && extractIdentifier(query.trim()) && (
+            {/* Bulk mode indicator */}
+            {isBulkMode && (
                 <div style={{
                     marginTop: 'var(--space-sm)',
                     marginBottom: 'var(--space-md)',
-                    padding: 'var(--space-sm) var(--space-md)',
-                    background: 'var(--color-accent-muted)',
+                    padding: 'var(--space-md)',
+                    background: 'rgba(88, 166, 255, 0.15)',
                     borderRadius: 'var(--radius-md)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 'var(--space-sm)'
+                    border: '1px solid rgba(88, 166, 255, 0.3)'
                 }}>
-                    <LinkIcon />
-                    <span style={{ flex: 1 }}>
-                        Go directly to item: <strong>{extractIdentifier(query.trim())}</strong>
-                    </span>
-                    <button class="btn btn-primary" onClick={handleGoToIdentifier}>
-                        Open Item
-                    </button>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-sm)', marginBottom: 'var(--space-sm)' }}>
+                        <LinkIcon />
+                        <strong>Bulk Download Mode</strong>
+                        <span class="result-badge" style={{ marginLeft: 'auto' }}>{parsedUrls.length} items</span>
+                    </div>
+                    <div style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)', marginBottom: 'var(--space-md)' }}>
+                        {parsedUrls.filter(p => p.filename).length} specific files, {parsedUrls.filter(p => !p.filename).length} full items
+                    </div>
+                    <div style={{ display: 'flex', gap: 'var(--space-sm)', flexWrap: 'wrap' }}>
+                        <button
+                            class="btn btn-primary"
+                            onClick={handleBulkDownload}
+                            disabled={downloading}
+                        >
+                            {downloading ? downloadProgress || 'Queuing...' : `📥 Download All ${parsedUrls.length} Items`}
+                        </button>
+                        <button class="btn btn-secondary" onClick={() => setQuery('')}>
+                            Clear
+                        </button>
+                    </div>
                 </div>
             )}
+
+            {/* Single URL mode - Quick access */}
+            {!isBulkMode && query.trim() && parseArchiveUrl(query.trim()) && (() => {
+                const parsed = parseArchiveUrl(query.trim());
+                return (
+                    <div style={{
+                        marginTop: 'var(--space-sm)',
+                        marginBottom: 'var(--space-md)',
+                        padding: 'var(--space-sm) var(--space-md)',
+                        background: parsed.filename ? 'rgba(63, 185, 80, 0.15)' : 'var(--color-accent-muted)',
+                        borderRadius: 'var(--radius-md)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 'var(--space-sm)',
+                        border: parsed.filename ? '1px solid rgba(63, 185, 80, 0.3)' : 'none'
+                    }}>
+                        <LinkIcon />
+                        <span style={{ flex: 1 }}>
+                            {parsed.filename ? (
+                                <>Download file: <strong>{parsed.filename}</strong> from <strong>{parsed.identifier}</strong></>
+                            ) : (
+                                <>Go directly to item: <strong>{parsed.identifier}</strong></>
+                            )}
+                        </span>
+                        <button class="btn btn-primary" onClick={handleGoToIdentifier} disabled={downloading}>
+                            {downloading ? 'Starting...' : parsed.filename ? '📥 Download' : 'Open Item'}
+                        </button>
+                    </div>
+                );
+            })()}
 
             {/* Advanced Filters */}
             {showFilters && (
