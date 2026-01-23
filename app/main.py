@@ -3,15 +3,24 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pathlib import Path
+import logging
 
 from app.routes import auth, search, items, downloads, settings
 
+VERSION = "0.5.2"
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 app = FastAPI(
     title="IA Docker GUI",
     description="Web GUI for Internet Archive CLI",
-    version="0.5.2"
+    version=VERSION
 )
+
+@app.on_event("startup")
+async def startup_event():
+    logger.info(f"🚀 IA Docker GUI v{VERSION} starting up...")
+    logger.info(f"📁 Static path: {Path(__file__).parent / 'static'}")
 
 # CORS for development
 app.add_middleware(
@@ -26,7 +35,7 @@ app.add_middleware(
 @app.get("/api/health")
 async def health_check():
     """Health check endpoint for Docker."""
-    return {"status": "ok"}
+    return {"status": "ok", "version": VERSION}
 
 
 # Register API routes BEFORE static files
