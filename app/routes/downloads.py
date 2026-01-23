@@ -17,7 +17,8 @@ async def start_download(request: DownloadRequest):
         identifier=request.identifier,
         files=request.files,
         glob=request.glob,
-        format=request.format
+        format=request.format,
+        destdir=request.destdir,
     )
     return job
 

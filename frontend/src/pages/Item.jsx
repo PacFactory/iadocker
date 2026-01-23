@@ -40,6 +40,12 @@ const ExternalIcon = () => (
     </svg>
 );
 
+const FolderIcon = () => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+        <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+    </svg>
+);
+
 function formatBytes(bytes) {
     if (!bytes) return 'Unknown size';
     const num = parseInt(bytes);
@@ -77,12 +83,75 @@ function getFileGroup(ext) {
     return 'Other';
 }
 
+// Download Modal Component
+function DownloadModal({ isOpen, onClose, onConfirm, identifier, filename, fileCount }) {
+    const [destdir, setDestdir] = useState('');
+
+    if (!isOpen) return null;
+
+    const handleConfirm = () => {
+        onConfirm(destdir.trim() || null);
+        setDestdir('');
+    };
+
+    const handleClose = () => {
+        setDestdir('');
+        onClose();
+    };
+
+    const displayName = filename || `${fileCount} files`;
+    const defaultPath = `/data/${identifier}/`;
+    const customPath = destdir ? `/data/${destdir.replace(/^\/+/, '')}/${identifier}/` : defaultPath;
+
+    return (
+        <div class="modal-overlay" onClick={handleClose}>
+            <div class="modal-content" onClick={e => e.stopPropagation()}>
+                <div class="modal-header">
+                    <h3 style={{ margin: 0 }}>📥 Download Location</h3>
+                </div>
+                <div class="modal-body">
+                    <p style={{ marginBottom: 'var(--space-md)', color: 'var(--color-text-secondary)' }}>
+                        Downloading: <strong>{displayName}</strong>
+                    </p>
+
+                    <label class="form-label">
+                        <FolderIcon /> Custom Path (optional)
+                    </label>
+                    <input
+                        type="text"
+                        class="form-input"
+                        placeholder="e.g., games/roms or leave empty for default"
+                        value={destdir}
+                        onInput={(e) => setDestdir(e.target.value)}
+                        style={{ marginBottom: 'var(--space-sm)' }}
+                    />
+                    <p class="text-secondary" style={{ fontSize: '0.8rem', marginBottom: 'var(--space-md)' }}>
+                        Files will be saved to: <code>{customPath}</code>
+                    </p>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" onClick={handleClose}>
+                        Cancel
+                    </button>
+                    <button class="btn btn-primary" onClick={handleConfirm}>
+                        <DownloadIcon /> Start Download
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 export default function Item({ identifier }) {
     const { addToast } = useToast();
     const [item, setItem] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [downloading, setDownloading] = useState({});
+
+    // Download modal state
+    const [modalOpen, setModalOpen] = useState(false);
+    const [pendingDownload, setPendingDownload] = useState(null);
 
     // File filtering
     const [fileSearch, setFileSearch] = useState('');
@@ -139,44 +208,50 @@ export default function Item({ identifier }) {
         return Array.from(types).sort();
     }, [item?.files]);
 
-    const handleDownload = async (filename) => {
-        setDownloading(prev => ({ ...prev, [filename]: true }));
+    // Open download modal with pending download info
+    const openDownloadModal = (type, files = null, filename = null) => {
+        setPendingDownload({ type, files, filename });
+        setModalOpen(true);
+    };
+
+    // Execute download after modal confirmation
+    const executeDownload = async (destdir) => {
+        if (!pendingDownload) return;
+
+        const { type, files, filename } = pendingDownload;
+        const downloadKey = filename || (type === 'all' ? '__all__' : '__filtered__');
+
+        setModalOpen(false);
+        setDownloading(prev => ({ ...prev, [downloadKey]: true }));
+
         try {
-            await api.startDownload(identifier, [filename]);
-            addToast(`📥 Added ${filename} to queue`, 'success');
-            setDownloading(prev => ({ ...prev, [filename]: false }));
+            await api.startDownload(identifier, files, null, null, destdir);
+            const message = filename
+                ? `📥 Added ${filename} to queue`
+                : type === 'all'
+                    ? `📥 Added all files from ${identifier} to queue`
+                    : `📥 Added ${files.length} files to queue`;
+            addToast(message, 'success');
         } catch (err) {
             console.error('Download failed:', err);
             addToast('Failed to start download', 'error');
-            setDownloading(prev => ({ ...prev, [filename]: false }));
+        } finally {
+            setDownloading(prev => ({ ...prev, [downloadKey]: false }));
+            setPendingDownload(null);
         }
     };
 
-    const handleDownloadAll = async () => {
-        setDownloading(prev => ({ ...prev, __all__: true }));
-        try {
-            await api.startDownload(identifier);
-            addToast(`📥 Added all files from ${identifier} to queue`, 'success');
-            setDownloading(prev => ({ ...prev, __all__: false }));
-        } catch (err) {
-            console.error('Download failed:', err);
-            addToast('Failed to start download', 'error');
-            setDownloading(prev => ({ ...prev, __all__: false }));
-        }
+    const handleDownload = (filename) => {
+        openDownloadModal('single', [filename], filename);
     };
 
-    const handleDownloadFiltered = async () => {
-        setDownloading(prev => ({ ...prev, __filtered__: true }));
-        try {
-            const filenames = filteredFiles.map(f => f.name);
-            await api.startDownload(identifier, filenames);
-            addToast(`📥 Added ${filenames.length} files to queue`, 'success');
-            setDownloading(prev => ({ ...prev, __filtered__: false }));
-        } catch (err) {
-            console.error('Download failed:', err);
-            addToast('Failed to start download', 'error');
-            setDownloading(prev => ({ ...prev, __filtered__: false }));
-        }
+    const handleDownloadAll = () => {
+        openDownloadModal('all', null, null);
+    };
+
+    const handleDownloadFiltered = () => {
+        const filenames = filteredFiles.map(f => f.name);
+        openDownloadModal('filtered', filenames, null);
     };
 
     if (loading) {
@@ -374,6 +449,19 @@ export default function Item({ identifier }) {
                     </div>
                 </div>
             </div>
+
+            {/* Download Path Modal */}
+            <DownloadModal
+                isOpen={modalOpen}
+                onClose={() => {
+                    setModalOpen(false);
+                    setPendingDownload(null);
+                }}
+                onConfirm={executeDownload}
+                identifier={identifier}
+                filename={pendingDownload?.filename}
+                fileCount={pendingDownload?.files?.length || item?.files?.length || 0}
+            />
         </div>
     );
 }

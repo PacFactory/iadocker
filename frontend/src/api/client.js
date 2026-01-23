@@ -36,9 +36,9 @@ export const api = {
     getItemFiles: (identifier) => request(`/items/${identifier}/files`),
 
     // Downloads
-    startDownload: (identifier, files, glob, format) => request('/downloads', {
+    startDownload: (identifier, files, glob, format, destdir) => request('/downloads', {
         method: 'POST',
-        body: JSON.stringify({ identifier, files, glob, format }),
+        body: JSON.stringify({ identifier, files, glob, format, destdir }),
     }),
     getDownloads: () => request('/downloads'),
     cancelDownload: (jobId) => request(`/downloads/${jobId}`, { method: 'DELETE' }),

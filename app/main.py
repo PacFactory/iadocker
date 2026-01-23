@@ -10,7 +10,7 @@ from app.routes import auth, search, items, downloads, settings
 app = FastAPI(
     title="IA Docker GUI",
     description="Web GUI for Internet Archive CLI",
-    version="1.0.0"
+    version="0.5.2"
 )
 
 # CORS for development

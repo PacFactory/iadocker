@@ -40,15 +40,43 @@ class JobManager:
         """Update max concurrent downloads at runtime."""
         self._max_concurrent_downloads = max(1, min(10, value))  # Clamp 1-10
     
+    def _validate_destdir(self, destdir: Optional[str]) -> Optional[str]:
+        """Validate and sanitize destdir to prevent path traversal."""
+        if not destdir:
+            return None
+        
+        # Remove leading/trailing slashes and normalize
+        clean_path = destdir.strip().strip('/')
+        
+        # Reject any path traversal attempts
+        if '..' in clean_path or clean_path.startswith('/'):
+            return None
+        
+        # Build full path and verify it's within /data
+        from pathlib import Path
+        base_path = Path(settings.download_dir).resolve()
+        full_path = (base_path / clean_path).resolve()
+        
+        # Ensure the resolved path is still under /data
+        try:
+            full_path.relative_to(base_path)
+            return str(full_path)
+        except ValueError:
+            return None
+    
     async def create_download_job(
         self,
         identifier: str,
         files: Optional[list[str]] = None,
         glob: Optional[str] = None,
         format: Optional[str] = None,
+        destdir: Optional[str] = None,
     ) -> Job:
         """Create a new download job."""
         job_id = str(uuid.uuid4())[:8]
+        
+        # Validate and resolve destdir
+        validated_destdir = self._validate_destdir(destdir)
         
         job = Job(
             id=job_id,
@@ -56,6 +84,7 @@ class JobManager:
             status=JobStatus.PENDING,
             identifier=identifier,
             filename=files[0] if files and len(files) == 1 else None,
+            destdir=validated_destdir,
         )
         
         async with self._lock:
@@ -76,6 +105,8 @@ class JobManager:
         glob: Optional[str],
         format: Optional[str],
     ):
+        # Use custom destdir if set, otherwise default
+        destdir = job.destdir
         """Process a download job."""
         job_id = job.id
         
@@ -109,9 +140,10 @@ class JobManager:
                         break
                     success = await loop.run_in_executor(
                         None,
-                        lambda: self._ia_service.download_file(
+                        lambda f=filename: self._ia_service.download_file(
                             job.identifier,
-                            filename,
+                            f,
+                            destdir=destdir,
                         )
                     )
                     if not success:
@@ -123,6 +155,7 @@ class JobManager:
                         job.identifier,
                         glob=glob,
                         format=format,
+                        destdir=destdir,
                     )
                 )
                 if not success:
@@ -156,7 +189,12 @@ class JobManager:
         import time
         
         try:
-            download_dir = settings.download_path / job.identifier
+            # Use custom destdir if set
+            if job.destdir:
+                from pathlib import Path
+                download_dir = Path(job.destdir) / job.identifier
+            else:
+                download_dir = settings.download_path / job.identifier
             expected_size = 0
             
             # Try to get expected size from item metadata

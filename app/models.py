@@ -31,6 +31,7 @@ class Job(BaseModel):
     downloaded_bytes: Optional[int] = None
     speed: Optional[float] = None  # bytes per second
     error: Optional[str] = None
+    destdir: Optional[str] = None  # Custom destination directory
     created_at: datetime = Field(default_factory=datetime.now)
     started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
@@ -106,6 +107,7 @@ class DownloadRequest(BaseModel):
     files: Optional[list[str]] = None  # None = download all
     glob: Optional[str] = None
     format: Optional[str] = None
+    destdir: Optional[str] = None  # Custom destination path within /data volume
 
 
 class UploadRequest(BaseModel):
