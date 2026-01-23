@@ -75,11 +75,12 @@ class ItemFile(BaseModel):
     def size_str(self) -> str:
         if not self.size:
             return "Unknown"
+        size = self.size  # Use local variable to avoid mutation
         for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
-            if self.size < 1024:
-                return f"{self.size:.1f} {unit}"
-            self.size /= 1024
-        return f"{self.size:.1f} PB"
+            if size < 1024:
+                return f"{size:.1f} {unit}"
+            size /= 1024
+        return f"{size:.1f} PB"
 
 
 class Item(BaseModel):

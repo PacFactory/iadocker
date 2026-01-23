@@ -64,14 +64,20 @@ async def get_settings():
 
 @router.put("", response_model=AppSettings)
 async def update_settings(new_settings: AppSettings):
-    """Update application settings."""
+    """Update application settings.
+    
+    Only updates fields that were explicitly sent in the request.
+    Fields not included in the request body are preserved.
+    """
     settings = load_settings()
-    settings.update(new_settings.model_dump())
+    # Only update fields that were explicitly set in the request
+    settings.update(new_settings.model_dump(exclude_unset=True))
     save_settings(settings)
     
-    # Update the job manager's concurrent downloads limit
-    from app.services.job_manager import job_manager
-    job_manager.set_max_concurrent_downloads(new_settings.max_concurrent_downloads)
+    # Update the job manager's concurrent downloads limit if it was set
+    if new_settings.max_concurrent_downloads is not None:
+        from app.services.job_manager import job_manager
+        job_manager.set_max_concurrent_downloads(settings["max_concurrent_downloads"])
     
     return AppSettings(**settings)
 
