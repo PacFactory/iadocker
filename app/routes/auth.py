@@ -27,19 +27,40 @@ def get_config_email(config):
     if not config:
         return None
     
-    # Try s3 section first (indicates successful auth)
-    if config.has_section('s3') and config.has_option('s3', 'access'):
-        # Get email from cookies
-        if config.has_section('cookies'):
-            return config.get('cookies', 'logged-in-user', fallback=None)
-        if config.has_section('general'):
-            return config.get('general', 'screenname', fallback=None)
+    email = None
     
-    # Fallback to cookies section
+    # Try cookies section
     if config.has_section('cookies') and config.has_option('cookies', 'logged-in-user'):
-        return config.get('cookies', 'logged-in-user', fallback=None)
+        raw_value = config.get('cookies', 'logged-in-user', fallback=None)
+        if raw_value:
+            email = parse_email_from_cookie(raw_value)
     
-    return None
+    # Fallback to general section
+    if not email and config.has_section('general'):
+        email = config.get('general', 'screenname', fallback=None)
+    
+    return email
+
+
+def parse_email_from_cookie(cookie_value):
+    """Parse email from cookie value which may include metadata."""
+    if not cookie_value:
+        return None
+    
+    from urllib.parse import unquote
+    
+    # Cookie value might be: "email@domain.com; expires=...; path=..." or just "email%40domain.com"
+    # First, take only the part before any semicolon
+    value = cookie_value.split(';')[0].strip()
+    
+    # URL decode (e.g., %40 -> @)
+    value = unquote(value)
+    
+    # If it looks like an email, return it
+    if '@' in value and '.' in value:
+        return value
+    
+    return cookie_value  # Fallback to original
 
 
 def is_config_valid(config):

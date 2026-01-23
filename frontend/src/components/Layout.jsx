@@ -1,6 +1,6 @@
 import { h } from 'preact';
 
-const VERSION = 'v0.3.0';
+const VERSION = 'v0.3.1';
 
 // Icons
 const SearchIcon = () => (

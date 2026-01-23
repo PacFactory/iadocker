@@ -133,6 +133,8 @@ export default function Search() {
     const [total, setTotal] = useState(0);
     const [page, setPage] = useState(1);
     const [showFilters, setShowFilters] = useState(false);
+    const [showBulkMode, setShowBulkMode] = useState(false);
+    const [bulkUrls, setBulkUrls] = useState('');
     const [downloading, setDownloading] = useState(false);
     const [downloadProgress, setDownloadProgress] = useState('');
 
@@ -143,7 +145,10 @@ export default function Search() {
     const [year, setYear] = useState('');
     const [creator, setCreator] = useState('');
 
-    // Check if input has multiple URLs
+    // Parse bulk URLs from textarea
+    const parsedBulkUrls = parseMultipleUrls(bulkUrls);
+
+    // Check if search input has multiple URLs (legacy mode)
     const parsedUrls = query.includes('\n') || query.includes('archive.org')
         ? parseMultipleUrls(query)
         : [];
@@ -311,10 +316,84 @@ export default function Search() {
                     <ChevronIcon open={showFilters} />
                 </button>
 
+                <button
+                    type="button"
+                    class={`btn ${showBulkMode ? 'btn-primary' : 'btn-secondary'}`}
+                    onClick={() => setShowBulkMode(!showBulkMode)}
+                    style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+                >
+                    📥 Bulk
+                </button>
+
                 <button type="submit" class="btn btn-primary btn-lg" disabled={loading}>
                     {loading ? 'Searching...' : 'Search'}
                 </button>
             </form>
+
+            {/* Dedicated Bulk Download Panel */}
+            {showBulkMode && (
+                <div class="card" style={{ marginBottom: 'var(--space-lg)' }}>
+                    <div class="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <strong>📥 Bulk Download</strong>
+                        {parsedBulkUrls.length > 0 && (
+                            <span class="result-badge">{parsedBulkUrls.length} items detected</span>
+                        )}
+                    </div>
+                    <div class="card-body">
+                        <div class="form-group" style={{ marginBottom: 'var(--space-md)' }}>
+                            <label class="form-label">Paste archive.org URLs (one per line)</label>
+                            <textarea
+                                class="form-input"
+                                rows="6"
+                                placeholder={`https://archive.org/download/item1/file.zip\nhttps://archive.org/details/item2\nhttps://archive.org/download/item3/folder/file.mp4`}
+                                value={bulkUrls}
+                                onInput={(e) => setBulkUrls(e.target.value)}
+                                style={{ fontFamily: 'var(--font-mono)', fontSize: '0.875rem' }}
+                            />
+                        </div>
+                        {parsedBulkUrls.length > 0 && (
+                            <div style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)', marginBottom: 'var(--space-md)' }}>
+                                {parsedBulkUrls.filter(p => p.filename).length} specific files, {parsedBulkUrls.filter(p => !p.filename).length} full items
+                            </div>
+                        )}
+                        <div style={{ display: 'flex', gap: 'var(--space-sm)' }}>
+                            <button
+                                class="btn btn-primary"
+                                onClick={async () => {
+                                    if (parsedBulkUrls.length === 0) return;
+                                    setDownloading(true);
+                                    setDownloadProgress(`Queuing 0/${parsedBulkUrls.length}...`);
+                                    let queued = 0;
+                                    for (const item of parsedBulkUrls) {
+                                        try {
+                                            if (item.filename) {
+                                                await api.startDownload(item.identifier, [item.filename]);
+                                            } else {
+                                                await api.startDownload(item.identifier);
+                                            }
+                                            queued++;
+                                            setDownloadProgress(`Queuing ${queued}/${parsedBulkUrls.length}...`);
+                                        } catch (err) {
+                                            console.error(`Failed to queue ${item.identifier}:`, err);
+                                        }
+                                    }
+                                    setDownloadProgress('');
+                                    setDownloading(false);
+                                    setBulkUrls('');
+                                    setShowBulkMode(false);
+                                    route('/downloads');
+                                }}
+                                disabled={downloading || parsedBulkUrls.length === 0}
+                            >
+                                {downloading ? downloadProgress || 'Queuing...' : `Download ${parsedBulkUrls.length} Items`}
+                            </button>
+                            <button class="btn btn-secondary" onClick={() => setBulkUrls('')}>
+                                Clear
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Bulk mode indicator */}
             {isBulkMode && (
