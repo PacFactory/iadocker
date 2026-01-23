@@ -157,7 +157,7 @@ class JobManager:
         
         # Start progress monitor task
         progress_task = asyncio.create_task(
-            self._monitor_progress(job, files)
+            self._monitor_progress(job, files, download_options)
         )
         
         try:
@@ -231,17 +231,26 @@ class JobManager:
         
         await self._notify_download_progress(job)
     
-    async def _monitor_progress(self, job: Job, files: Optional[list[str]]):
+    async def _monitor_progress(self, job: Job, files: Optional[list[str]], download_options: dict):
         """Monitor download progress by checking file sizes."""
         import time
         
         try:
-            # Use custom destdir if set
+            no_directories = download_options.get("no_directories", False)
+            
+            # Determine download directory based on no_directories option
             if job.destdir:
                 from pathlib import Path
-                download_dir = Path(job.destdir) / job.identifier
+                base_dir = Path(job.destdir)
             else:
-                download_dir = settings.download_path / job.identifier
+                base_dir = settings.download_path
+            
+            # With no_directories=True, files go directly to base_dir
+            # Otherwise, they go to base_dir/identifier/
+            if no_directories:
+                download_dir = base_dir
+            else:
+                download_dir = base_dir / job.identifier
             expected_size = 0
             
             # Try to get expected size from item metadata
