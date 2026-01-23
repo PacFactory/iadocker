@@ -118,9 +118,9 @@ export default function Downloads() {
                                 {job.status === 'completed' ? <CheckIcon /> : <DownloadIcon />}
                             </div>
                             <div class="job-info" style={{ flex: 1 }}>
-                                <div class="job-title">{job.identifier}</div>
+                                <div class="job-title">{job.filename || 'All files'}</div>
                                 <div class="job-subtitle">
-                                    {job.filename || 'All files'}
+                                    {job.identifier}
                                     {job.error && ` • ${job.error}`}
                                 </div>
                                 {job.status === 'running' && (
