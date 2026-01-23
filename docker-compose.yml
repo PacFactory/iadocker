@@ -1,0 +1,19 @@
+services:
+  iadocker:
+    build: .
+    container_name: iadocker
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./config:/config
+      - ./data:/data
+    environment:
+      - IA_CONFIG_FILE=/config/ia.ini
+      - DOWNLOAD_DIR=/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
