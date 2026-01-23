@@ -134,6 +134,8 @@ class JobManager:
     
     async def _monitor_progress(self, job: Job, files: Optional[list[str]]):
         """Monitor download progress by checking file sizes."""
+        import time
+        
         try:
             download_dir = settings.download_path / job.identifier
             expected_size = 0
@@ -155,9 +157,14 @@ class JobManager:
             except:
                 pass
             
+            job.total_bytes = expected_size if expected_size > 0 else None
+            
             last_progress = 0
+            last_size = 0
+            last_time = time.time()
+            
             while job.status == JobStatus.RUNNING:
-                await asyncio.sleep(2)  # Check every 2 seconds
+                await asyncio.sleep(1)  # Check every 1 second for smoother updates
                 
                 if job.status != JobStatus.RUNNING:
                     break
@@ -172,18 +179,32 @@ class JobManager:
                             except:
                                 pass
                 
-                # Calculate progress
+                current_time = time.time()
+                time_delta = current_time - last_time
+                
+                # Calculate speed (bytes per second)
+                if time_delta > 0:
+                    bytes_delta = current_size - last_size
+                    speed = bytes_delta / time_delta
+                    job.speed = max(0, speed)  # Ensure non-negative
+                
+                job.downloaded_bytes = current_size
+                
+                # Calculate progress percentage
                 if expected_size > 0:
-                    progress = min(95, (current_size / expected_size) * 100)
+                    progress = min(99, (current_size / expected_size) * 100)
                 else:
                     # If we don't know expected size, show indeterminate progress
-                    progress = min(95, last_progress + 5)
+                    progress = min(95, last_progress + 2)
                 
-                # Only notify if progress changed significantly
-                if abs(progress - last_progress) >= 2:
+                # Only notify if progress changed
+                if abs(progress - last_progress) >= 1 or abs(current_size - last_size) > 1024 * 100:
                     job.progress = round(progress, 1)
-                    last_progress = progress
                     await self._notify_download_progress(job)
+                    last_progress = progress
+                
+                last_size = current_size
+                last_time = current_time
         
         except asyncio.CancelledError:
             pass

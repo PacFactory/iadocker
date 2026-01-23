@@ -23,6 +23,23 @@ const CheckIcon = () => (
     </svg>
 );
 
+function formatBytes(bytes) {
+    if (!bytes && bytes !== 0) return '';
+    const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+    let i = 0;
+    let size = bytes;
+    while (size >= 1024 && i < units.length - 1) {
+        size /= 1024;
+        i++;
+    }
+    return `${size.toFixed(1)} ${units[i]}`;
+}
+
+function formatSpeed(bytesPerSecond) {
+    if (!bytesPerSecond || bytesPerSecond <= 0) return '';
+    return `${formatBytes(bytesPerSecond)}/s`;
+}
+
 export default function Downloads() {
     const [jobs, setJobs] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -124,8 +141,28 @@ export default function Downloads() {
                                     {job.error && ` • ${job.error}`}
                                 </div>
                                 {job.status === 'running' && (
-                                    <div class="progress-bar" style={{ marginTop: 'var(--space-sm)' }}>
-                                        <div class="progress-fill" style={{ width: `${job.progress}%` }}></div>
+                                    <div style={{ marginTop: 'var(--space-sm)' }}>
+                                        <div class="progress-bar">
+                                            <div class="progress-fill" style={{ width: `${job.progress}%` }}></div>
+                                        </div>
+                                        <div style={{
+                                            marginTop: '4px',
+                                            fontSize: '0.75rem',
+                                            color: 'var(--color-text-secondary)',
+                                            display: 'flex',
+                                            justifyContent: 'space-between',
+                                            gap: 'var(--space-md)'
+                                        }}>
+                                            <span>
+                                                {job.progress.toFixed(1)}%
+                                                {job.downloaded_bytes && job.total_bytes && (
+                                                    <> • {formatBytes(job.downloaded_bytes)} / {formatBytes(job.total_bytes)}</>
+                                                )}
+                                            </span>
+                                            {job.speed > 0 && (
+                                                <span>{formatSpeed(job.speed)}</span>
+                                            )}
+                                        </div>
                                     </div>
                                 )}
                             </div>

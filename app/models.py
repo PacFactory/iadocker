@@ -29,6 +29,7 @@ class Job(BaseModel):
     progress: float = 0.0
     total_bytes: Optional[int] = None
     downloaded_bytes: Optional[int] = None
+    speed: Optional[float] = None  # bytes per second
     error: Optional[str] = None
     created_at: datetime = Field(default_factory=datetime.now)
     started_at: Optional[datetime] = None
