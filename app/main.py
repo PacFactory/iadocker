@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pathlib import Path
 
@@ -21,20 +22,29 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Register API routes
+# Health check MUST be before static files mount
+@app.get("/api/health")
+async def health_check():
+    """Health check endpoint for Docker."""
+    return {"status": "ok"}
+
+
+# Register API routes BEFORE static files
 app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
 app.include_router(search.router, prefix="/api/search", tags=["search"])
 app.include_router(items.router, prefix="/api/items", tags=["items"])
 app.include_router(downloads.router, prefix="/api/downloads", tags=["downloads"])
 
 
-# Serve static files (frontend)
+# Serve static files (frontend) - MUST be last
 static_path = Path(__file__).parent / "static"
 if static_path.exists():
-    app.mount("/", StaticFiles(directory=static_path, html=True), name="static")
-
-
-@app.get("/api/health")
-async def health_check():
-    """Health check endpoint."""
-    return {"status": "ok"}
+    # Serve index.html for SPA routes
+    @app.get("/{full_path:path}")
+    async def serve_spa(full_path: str):
+        """Serve frontend SPA - catches all non-API routes."""
+        file_path = static_path / full_path
+        if file_path.exists() and file_path.is_file():
+            return FileResponse(file_path)
+        # Return index.html for SPA client-side routing
+        return FileResponse(static_path / "index.html")
