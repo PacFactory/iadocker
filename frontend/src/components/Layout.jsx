@@ -1,4 +1,5 @@
 import { Match } from 'preact-router/match';
+import { useState, useEffect } from 'preact/hooks';
 
 // Version injected by Vite from .version file
 const VERSION = `v${__APP_VERSION__}`;
@@ -26,6 +27,21 @@ const SettingsIcon = () => (
     </svg>
 );
 
+const MenuIcon = () => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <line x1="3" y1="12" x2="21" y2="12" />
+        <line x1="3" y1="6" x2="21" y2="6" />
+        <line x1="3" y1="18" x2="21" y2="18" />
+    </svg>
+);
+
+const CloseIcon = () => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <line x1="18" y1="6" x2="6" y2="18" />
+        <line x1="6" y1="6" x2="18" y2="18" />
+    </svg>
+);
+
 const ArchiveLogo = () => (
     <svg viewBox="0 0 100 100" width="28" height="28">
         <rect x="10" y="70" width="80" height="20" fill="#58a6ff" rx="4" />
@@ -45,6 +61,30 @@ const isActive = (path, url) => {
 };
 
 export default function Layout({ children }) {
+    const [sidebarOpen, setSidebarOpen] = useState(false);
+    const [isMobile, setIsMobile] = useState(false);
+
+    // Check screen size on mount and resize
+    useEffect(() => {
+        const checkMobile = () => {
+            setIsMobile(window.innerWidth < 1024);
+        };
+        
+        checkMobile();
+        window.addEventListener('resize', checkMobile);
+        return () => window.removeEventListener('resize', checkMobile);
+    }, []);
+
+    const toggleSidebar = () => {
+        setSidebarOpen(!sidebarOpen);
+    };
+
+    const closeSidebar = () => {
+        if (isMobile) {
+            setSidebarOpen(false);
+        }
+    };
+
     const navItems = [
         { path: '/', icon: SearchIcon, label: 'Search' },
         { path: '/downloads', icon: DownloadIcon, label: 'Downloads' },
@@ -53,7 +93,21 @@ export default function Layout({ children }) {
 
     return (
         <div class="layout">
-            <aside class="sidebar">
+            {/* Mobile menu button */}
+            <button 
+                class="mobile-menu-btn" 
+                onClick={toggleSidebar}
+                aria-label="Toggle menu"
+            >
+                {sidebarOpen ? <CloseIcon /> : <MenuIcon />}
+            </button>
+
+            {/* Overlay for mobile */}
+            {isMobile && sidebarOpen && (
+                <div class="sidebar-overlay" onClick={closeSidebar}></div>
+            )}
+
+            <aside class={`sidebar ${sidebarOpen ? 'sidebar-open' : ''}`}>
                 <div class="sidebar-header">
                     <div class="sidebar-logo">
                         <ArchiveLogo />
@@ -67,6 +121,7 @@ export default function Layout({ children }) {
                                 key={item.path}
                                 class={`nav-item ${isActive(item.path, url) ? 'active' : ''}`}
                                 href={item.path}
+                                onClick={closeSidebar}
                             >
                                 <item.icon />
                                 <span>{item.label}</span>
