@@ -2,6 +2,7 @@ import { h } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
 import { route } from 'preact-router';
 import { api } from '../api/client';
+import { useToast } from '../components/Toast';
 
 const SearchIcon = () => (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -127,6 +128,7 @@ function parseMultipleUrls(input) {
 }
 
 export default function Search() {
+    const { addToast } = useToast();
     const [query, setQuery] = useState('');
     const [results, setResults] = useState([]);
     const [loading, setLoading] = useState(false);
@@ -136,7 +138,6 @@ export default function Search() {
     const [showBulkMode, setShowBulkMode] = useState(false);
     const [bulkUrls, setBulkUrls] = useState('');
     const [downloading, setDownloading] = useState(false);
-    const [downloadProgress, setDownloadProgress] = useState('');
 
     // Filters
     const [mediatype, setMediatype] = useState('');
@@ -173,9 +174,11 @@ export default function Search() {
                 setDownloading(true);
                 try {
                     await api.startDownload(parsed.identifier, [parsed.filename]);
-                    route('/downloads');
+                    addToast(`📥 Added ${parsed.filename} to queue`, 'success');
+                    setDownloading(false);
                 } catch (err) {
                     console.error('Download failed:', err);
+                    addToast('Failed to start download', 'error');
                     setDownloading(false);
                 }
                 return;
@@ -237,9 +240,8 @@ export default function Search() {
             }
         }
 
-        setDownloadProgress('');
+        addToast(`📥 Added ${parsedUrls.length} items to queue`, 'success');
         setDownloading(false);
-        route('/downloads');
     };
 
     const handleItemClick = (identifier) => {
@@ -250,13 +252,15 @@ export default function Search() {
         const parsed = parseArchiveUrl(query.trim());
         if (parsed) {
             if (parsed.filename) {
-                // Start download and go to downloads page
+                // Start download and show toast
                 setDownloading(true);
                 try {
                     await api.startDownload(parsed.identifier, [parsed.filename]);
-                    route('/downloads');
+                    addToast(`📥 Added ${parsed.filename} to queue`, 'success');
+                    setDownloading(false);
                 } catch (err) {
                     console.error('Download failed:', err);
+                    addToast('Failed to start download', 'error');
                     setDownloading(false);
                 }
             } else {
@@ -377,15 +381,14 @@ export default function Search() {
                                             console.error(`Failed to queue ${item.identifier}:`, err);
                                         }
                                     }
-                                    setDownloadProgress('');
+                                    addToast(`📥 Added ${parsedBulkUrls.length} items to queue`, 'success');
                                     setDownloading(false);
                                     setBulkUrls('');
                                     setShowBulkMode(false);
-                                    route('/downloads');
                                 }}
                                 disabled={downloading || parsedBulkUrls.length === 0}
                             >
-                                {downloading ? downloadProgress || 'Queuing...' : `Download ${parsedBulkUrls.length} Items`}
+                                {downloading ? 'Queuing...' : `Download ${parsedBulkUrls.length} Items`}
                             </button>
                             <button class="btn btn-secondary" onClick={() => setBulkUrls('')}>
                                 Clear
