@@ -139,6 +139,16 @@ export default function Search() {
     const [bulkUrls, setBulkUrls] = useState('');
     const [downloading, setDownloading] = useState(false);
     const [downloadProgress, setDownloadProgress] = useState('');
+    const [searchHistory, setSearchHistory] = useState([]);
+
+    // Load search history on mount
+    useEffect(() => {
+        api.getSettings().then(settings => {
+            if (settings.search_history) {
+                setSearchHistory(settings.search_history);
+            }
+        }).catch(() => { });
+    }, []);
 
     // Filters
     const [mediatype, setMediatype] = useState('');
@@ -212,6 +222,13 @@ export default function Search() {
             const data = await api.search(searchQuery, options);
             setResults(data.results);
             setTotal(data.total);
+
+            // Save to search history (deduplicate, limit to 10)
+            if (trimmedQuery && !parseArchiveUrl(trimmedQuery)) {
+                const newHistory = [trimmedQuery, ...searchHistory.filter(h => h !== trimmedQuery)].slice(0, 10);
+                setSearchHistory(newHistory);
+                api.updateSettings({ search_history: newHistory }).catch(() => { });
+            }
         } catch (error) {
             console.error('Search failed:', error);
         } finally {
@@ -623,6 +640,30 @@ export default function Search() {
                     <SearchIcon />
                     <h3>Start Your Search</h3>
                     <p>Enter a query, paste an archive.org URL, or browse by collection</p>
+
+                    {/* Recent searches */}
+                    {searchHistory.length > 0 && (
+                        <div style={{ marginTop: 'var(--space-lg)', width: '100%', maxWidth: '400px' }}>
+                            <div style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)', marginBottom: 'var(--space-sm)' }}>
+                                Recent searches
+                            </div>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-xs)', justifyContent: 'center' }}>
+                                {searchHistory.slice(0, 5).map((h, i) => (
+                                    <button
+                                        key={i}
+                                        class="btn btn-secondary"
+                                        style={{ fontSize: '0.85rem', padding: '4px 12px' }}
+                                        onClick={() => {
+                                            setQuery(h);
+                                            setTimeout(() => handleSearch(null, 1), 100);
+                                        }}
+                                    >
+                                        {h.length > 25 ? h.substring(0, 25) + '...' : h}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
 
                     {/* Quick browse collections */}
                     <div style={{ marginTop: 'var(--space-lg)', display: 'flex', flexWrap: 'wrap', gap: 'var(--space-sm)', justifyContent: 'center' }}>
