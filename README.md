@@ -2,7 +2,27 @@
 
 A web-based GUI wrapper for the Internet Archive `ia` CLI tool, built with Preact and FastAPI.
 
-![IA Docker GUI](https://archive.org/services/img/internetarchive)
+[![Build and Push](https://github.com/PacFactory/iadocker/actions/workflows/docker-publish.yml/badge.svg)](https://github.com/PacFactory/iadocker/actions/workflows/docker-publish.yml)
+
+## Docker Image
+
+```bash
+docker pull ghcr.io/pacfactory/iadocker:latest
+```
+
+Or use docker-compose:
+
+```yaml
+services:
+  iadocker:
+    image: ghcr.io/pacfactory/iadocker:latest
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./config:/config
+      - ./data:/data
+    restart: unless-stopped
+```
 
 ## Features
 
@@ -47,10 +67,6 @@ Credentials are stored in `/config/ia.ini` and persist across restarts.
 ## Development
 
 ```bash
-# Clone and setup
-git clone <repo>
-cd iadocker
-
 # Backend
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
@@ -60,7 +76,7 @@ cd frontend && npm install && npm run build
 cp -r dist ../app/static
 
 # Run
-cd .. && uvicorn app.main:app --port 8080 --reload
+uvicorn app.main:app --port 8080 --reload
 ```
 
 ## Tech Stack
