@@ -2,7 +2,6 @@ import asyncio
 import uuid
 from datetime import datetime
 from typing import Optional
-from collections import defaultdict
 import os
 
 from app.models import Job, JobStatus, JobType

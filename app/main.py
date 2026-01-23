@@ -70,7 +70,14 @@ if static_path.exists():
     @app.get("/{full_path:path}")
     async def serve_spa(full_path: str):
         """Serve frontend SPA - catches all non-API routes."""
-        file_path = static_path / full_path
+        # Validate path is within static_path (prevent path traversal)
+        file_path = (static_path / full_path).resolve()
+        try:
+            file_path.relative_to(static_path.resolve())
+        except ValueError:
+            # Path traversal attempt - serve index.html instead
+            return FileResponse(static_path / "index.html")
+        
         if file_path.exists() and file_path.is_file():
             return FileResponse(file_path)
         # Return index.html for SPA client-side routing
