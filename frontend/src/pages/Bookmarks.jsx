@@ -2,6 +2,7 @@ import { h } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
 import { api } from '../api/client';
 import { useToast } from '../components/Toast';
+import { plainTextDescription } from '../utils/description';
 
 const BookmarkIcon = ({ filled }) => (
     <svg viewBox="0 0 24 24" fill={filled ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" width="20" height="20">
@@ -88,92 +89,95 @@ export default function Bookmarks() {
                 <div class="card">
                     <div class="card-body" style={{ padding: 0 }}>
                         <div class="job-list">
-                            {bookmarks.map(bookmark => (
-                                <div key={bookmark.identifier} class="job-item" style={{ alignItems: 'flex-start' }}>
-                                    <a href={`/item/${bookmark.identifier}`} style={{ flexShrink: 0 }}>
-                                        <img
-                                            src={bookmark.thumbnail_url || `https://archive.org/services/img/${bookmark.identifier}`}
-                                            alt={bookmark.title || bookmark.identifier}
-                                            style={{
-                                                width: '80px',
-                                                height: '60px',
-                                                objectFit: 'cover',
-                                                borderRadius: 'var(--radius-sm)',
-                                            }}
-                                        />
-                                    </a>
-                                    <div class="job-info" style={{ minWidth: 0, flex: 1 }}>
-                                        <a href={`/item/${bookmark.identifier}`} class="job-title" style={{ textDecoration: 'none', color: 'inherit' }}>
-                                            {bookmark.title || bookmark.identifier}
+                            {bookmarks.map(bookmark => {
+                                const descriptionText = plainTextDescription(bookmark.description);
+                                return (
+                                    <div key={bookmark.identifier} class="job-item" style={{ alignItems: 'flex-start' }}>
+                                        <a href={`/item/${bookmark.identifier}`} style={{ flexShrink: 0 }}>
+                                            <img
+                                                src={bookmark.thumbnail_url || `https://archive.org/services/img/${bookmark.identifier}`}
+                                                alt={bookmark.title || bookmark.identifier}
+                                                style={{
+                                                    width: '80px',
+                                                    height: '60px',
+                                                    objectFit: 'cover',
+                                                    borderRadius: 'var(--radius-sm)',
+                                                }}
+                                            />
                                         </a>
-                                        <div class="job-subtitle" style={{ marginTop: '4px' }}>
-                                            <code style={{ fontSize: '0.75rem' }}>{bookmark.identifier}</code>
-                                            {bookmark.mediatype && (
-                                                <span class="result-badge" style={{ marginLeft: '8px', fontSize: '0.7rem' }}>
-                                                    {bookmark.mediatype}
-                                                </span>
+                                        <div class="job-info" style={{ minWidth: 0, flex: 1 }}>
+                                            <a href={`/item/${bookmark.identifier}`} class="job-title" style={{ textDecoration: 'none', color: 'inherit' }}>
+                                                {bookmark.title || bookmark.identifier}
+                                            </a>
+                                            <div class="job-subtitle" style={{ marginTop: '4px' }}>
+                                                <code style={{ fontSize: '0.75rem' }}>{bookmark.identifier}</code>
+                                                {bookmark.mediatype && (
+                                                    <span class="result-badge" style={{ marginLeft: '8px', fontSize: '0.7rem' }}>
+                                                        {bookmark.mediatype}
+                                                    </span>
+                                                )}
+                                            </div>
+                                            {descriptionText && (
+                                                <p style={{
+                                                    marginTop: '8px',
+                                                    fontSize: '0.85rem',
+                                                    color: 'var(--color-text-secondary)',
+                                                    overflow: 'hidden',
+                                                    textOverflow: 'ellipsis',
+                                                    display: '-webkit-box',
+                                                    WebkitLineClamp: 2,
+                                                    WebkitBoxOrient: 'vertical',
+                                                }}>
+                                                    {descriptionText}
+                                                </p>
+                                            )}
+                                            {bookmark.tags && bookmark.tags.length > 0 && (
+                                                <div style={{ marginTop: '8px', display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                                                    {bookmark.tags.map(tag => (
+                                                        <span key={tag} class="result-badge" style={{
+                                                            fontSize: '0.7rem',
+                                                            background: 'var(--color-accent-muted)',
+                                                            padding: '2px 6px',
+                                                        }}>
+                                                            {tag}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            )}
+                                            {bookmark.notes && (
+                                                <p style={{
+                                                    marginTop: '8px',
+                                                    fontSize: '0.8rem',
+                                                    fontStyle: 'italic',
+                                                    color: 'var(--color-text-secondary)',
+                                                }}>
+                                                    "{bookmark.notes}"
+                                                </p>
                                             )}
                                         </div>
-                                        {bookmark.description && (
-                                            <p style={{
-                                                marginTop: '8px',
-                                                fontSize: '0.85rem',
-                                                color: 'var(--color-text-secondary)',
-                                                overflow: 'hidden',
-                                                textOverflow: 'ellipsis',
-                                                display: '-webkit-box',
-                                                WebkitLineClamp: 2,
-                                                WebkitBoxOrient: 'vertical',
-                                            }}>
-                                                {bookmark.description}
-                                            </p>
-                                        )}
-                                        {bookmark.tags && bookmark.tags.length > 0 && (
-                                            <div style={{ marginTop: '8px', display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
-                                                {bookmark.tags.map(tag => (
-                                                    <span key={tag} class="result-badge" style={{
-                                                        fontSize: '0.7rem',
-                                                        background: 'var(--color-accent-muted)',
-                                                        padding: '2px 6px',
-                                                    }}>
-                                                        {tag}
-                                                    </span>
-                                                ))}
-                                            </div>
-                                        )}
-                                        {bookmark.notes && (
-                                            <p style={{
-                                                marginTop: '8px',
-                                                fontSize: '0.8rem',
-                                                fontStyle: 'italic',
-                                                color: 'var(--color-text-secondary)',
-                                            }}>
-                                                "{bookmark.notes}"
-                                            </p>
-                                        )}
+                                        <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
+                                            <a
+                                                href={`https://archive.org/details/${bookmark.identifier}`}
+                                                target="_blank"
+                                                rel="noopener"
+                                                class="btn btn-secondary btn-icon"
+                                                title="View on Archive.org"
+                                            >
+                                                <ExternalIcon />
+                                            </a>
+                                            <button
+                                                class="btn btn-secondary btn-icon"
+                                                onClick={() => handleDelete(bookmark.identifier)}
+                                                disabled={deleting[bookmark.identifier]}
+                                                title="Remove bookmark"
+                                                style={{ color: 'var(--color-error)' }}
+                                            >
+                                                <TrashIcon />
+                                            </button>
+                                        </div>
                                     </div>
-                                    <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
-                                        <a
-                                            href={`https://archive.org/details/${bookmark.identifier}`}
-                                            target="_blank"
-                                            rel="noopener"
-                                            class="btn btn-secondary btn-icon"
-                                            title="View on Archive.org"
-                                        >
-                                            <ExternalIcon />
-                                        </a>
-                                        <button
-                                            class="btn btn-secondary btn-icon"
-                                            onClick={() => handleDelete(bookmark.identifier)}
-                                            disabled={deleting[bookmark.identifier]}
-                                            title="Remove bookmark"
-                                            style={{ color: 'var(--color-error)' }}
-                                        >
-                                            <TrashIcon />
-                                        </button>
-                                    </div>
-                                </div>
-                            ))}
+                                );
+                            })}
                         </div>
                     </div>
                 </div>

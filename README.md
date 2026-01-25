@@ -1,7 +1,7 @@
 # IA Docker GUI
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Docker Hub](https://img.shields.io/docker/pulls/pacfactory/iadocker)](https://hub.docker.com/r/pacfactory/iadocker)
+[![Docker Hub](https://img.shields.io/docker/pulls/pacfactory/iadocker)](https://hub.docker.com/r/pacnpal/iadocker)
 [![GitHub Container Registry](https://img.shields.io/badge/ghcr.io-pacfactory%2Fiadocker-blue)](https://ghcr.io/pacfactory/iadocker)
 
 Web GUI for Internet Archive downloads, built with Preact + FastAPI.

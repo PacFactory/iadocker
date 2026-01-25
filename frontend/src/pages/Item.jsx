@@ -2,6 +2,7 @@ import { h } from 'preact';
 import { useState, useEffect, useMemo } from 'preact/hooks';
 import { api } from '../api/client';
 import { useToast } from '../components/Toast';
+import { sanitizeDescription, plainTextDescription } from '../utils/description';
 
 const DownloadIcon = () => (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
@@ -275,6 +276,7 @@ export default function Item({ identifier }) {
     const [fileSearch, setFileSearch] = useState('');
     const [fileType, setFileType] = useState('');
     const [showOriginalOnly, setShowOriginalOnly] = useState(false);
+    const [descriptionExpanded, setDescriptionExpanded] = useState(false);
 
     // Bookmark state
     const [isBookmarked, setIsBookmarked] = useState(false);
@@ -362,6 +364,16 @@ export default function Item({ identifier }) {
         item.files.forEach(f => types.add(getFileGroup(getExtension(f.name))));
         return Array.from(types).sort();
     }, [item?.files]);
+
+    // Description processing - must be before early returns (Rules of Hooks)
+    const descriptionSource = item?.metadata?.description || '';
+    const descriptionHtml = useMemo(() => sanitizeDescription(descriptionSource), [descriptionSource]);
+    const descriptionText = useMemo(() => plainTextDescription(descriptionSource), [descriptionSource]);
+    const descriptionIsLong = descriptionText.length > 360;
+
+    useEffect(() => {
+        setDescriptionExpanded(false);
+    }, [descriptionSource]);
 
     // Open download modal with pending download info
     const openDownloadModal = (type, files = null, filename = null) => {
@@ -489,11 +501,23 @@ export default function Item({ identifier }) {
                         {item?.metadata?.date && (
                             <p class="text-secondary">{item.metadata.date}</p>
                         )}
-                        {item?.metadata?.description && (
-                            <p style={{ marginTop: 'var(--space-md)', color: 'var(--color-text-secondary)' }}>
-                                {item.metadata.description.substring(0, 400)}
-                                {item.metadata.description.length > 400 ? '...' : ''}
-                            </p>
+                        {descriptionSource && (
+                            <div style={{ marginTop: 'var(--space-md)' }}>
+                                <div
+                                    class={`item-description ${descriptionIsLong && !descriptionExpanded ? 'item-description-clamped' : ''}`}
+                                    dangerouslySetInnerHTML={{ __html: descriptionHtml }}
+                                />
+                                {descriptionIsLong && (
+                                    <button
+                                        class="btn btn-secondary btn-sm"
+                                        onClick={() => setDescriptionExpanded(prev => !prev)}
+                                        aria-expanded={descriptionExpanded}
+                                        style={{ marginTop: 'var(--space-sm)' }}
+                                    >
+                                        {descriptionExpanded ? 'Show less' : 'Show full description'}
+                                    </button>
+                                )}
+                            </div>
                         )}
                         <div style={{ marginTop: 'var(--space-md)', display: 'flex', gap: 'var(--space-sm)', flexWrap: 'wrap' }}>
                             {item?.metadata?.mediatype && (

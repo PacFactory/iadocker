@@ -191,3 +191,5 @@ config/local.py
 config/local.yml
 config/local.yaml
 config/local.json
+.claude/
+.snapshots/
