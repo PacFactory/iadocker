@@ -5,7 +5,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from pathlib import Path
 import logging
 
-from app.routes import auth, search, items, downloads, settings
+from app.routes import auth, search, items, downloads, settings, bookmarks
+from app.database import init_db, close_db
 
 # Read version from .version file (single source of truth)
 def _read_version():
@@ -34,6 +35,19 @@ async def startup_event():
     logger.info(f"🚀 IA Docker GUI v{VERSION} starting up...")
     logger.info(f"📁 Static path: {Path(__file__).parent / 'static'}")
 
+    # Initialize database
+    await init_db()
+
+    # Initialize job manager from DB (mark interrupted jobs, load settings)
+    from app.services.job_manager import job_manager
+    await job_manager.initialize_from_db()
+
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    logger.info("Shutting down...")
+    await close_db()
+
 # CORS for development
 app.add_middleware(
     CORSMiddleware,
@@ -56,6 +70,7 @@ app.include_router(search.router, prefix="/api/search", tags=["search"])
 app.include_router(items.router, prefix="/api/items", tags=["items"])
 app.include_router(downloads.router, prefix="/api/downloads", tags=["downloads"])
 app.include_router(settings.router, prefix="/api/settings", tags=["settings"])
+app.include_router(bookmarks.router, prefix="/api/bookmarks", tags=["bookmarks"])
 
 
 # Serve static files (frontend) - MUST be last

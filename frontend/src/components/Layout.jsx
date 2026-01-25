@@ -20,6 +20,12 @@ const DownloadIcon = () => (
     </svg>
 );
 
+const BookmarkIcon = () => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
+    </svg>
+);
+
 const SettingsIcon = () => (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
         <circle cx="12" cy="12" r="3" />
@@ -109,6 +115,7 @@ export default function Layout({ children }) {
     const navItems = [
         { path: '/', icon: SearchIcon, label: 'Search' },
         { path: '/downloads', icon: DownloadIcon, label: 'Downloads' },
+        { path: '/bookmarks', icon: BookmarkIcon, label: 'Bookmarks' },
         { path: '/settings', icon: SettingsIcon, label: 'Settings' },
     ];
 

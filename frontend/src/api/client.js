@@ -71,6 +71,28 @@ export const api = {
         const params = path ? `?path=${encodeURIComponent(path)}` : '';
         return request(`/settings/directories${params}`);
     },
+
+    // Bookmarks
+    getBookmarks: () => request('/bookmarks'),
+    createBookmark: (identifier, options = {}) => request('/bookmarks', {
+        method: 'POST',
+        body: JSON.stringify({
+            identifier,
+            notes: options.notes || null,
+            tags: options.tags || [],
+        }),
+    }),
+    getBookmark: (identifier) => request(`/bookmarks/${encodeURIComponent(identifier)}`),
+    updateBookmark: (identifier, options = {}) => request(`/bookmarks/${encodeURIComponent(identifier)}`, {
+        method: 'PUT',
+        body: JSON.stringify({
+            notes: options.notes,
+            tags: options.tags,
+        }),
+    }),
+    deleteBookmark: (identifier) => request(`/bookmarks/${encodeURIComponent(identifier)}`, {
+        method: 'DELETE',
+    }),
 };
 
 // SSE helpers

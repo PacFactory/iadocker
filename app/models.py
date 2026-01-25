@@ -32,7 +32,7 @@ class Job(BaseModel):
     speed: Optional[float] = None  # bytes per second
     error: Optional[str] = None
     destdir: Optional[str] = None  # Custom destination directory
-    created_at: datetime = Field(default_factory=datetime.now)
+    created_at: datetime = Field(default_factory=datetime.utcnow)  # UTC, not local time
     started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
 
@@ -151,3 +151,29 @@ class ConfigureRequest(BaseModel):
     """Request to configure IA credentials."""
     email: str
     password: str
+
+
+class Bookmark(BaseModel):
+    """A bookmarked archive.org item."""
+    id: Optional[int] = None
+    identifier: str
+    title: Optional[str] = None
+    description: Optional[str] = None
+    mediatype: Optional[str] = None
+    thumbnail_url: Optional[str] = None
+    notes: Optional[str] = None
+    tags: list[str] = Field(default_factory=list)
+    created_at: Optional[datetime] = None
+
+
+class BookmarkCreate(BaseModel):
+    """Request to create a bookmark."""
+    identifier: str
+    notes: Optional[str] = None
+    tags: list[str] = Field(default_factory=list)
+
+
+class BookmarkUpdate(BaseModel):
+    """Request to update a bookmark."""
+    notes: Optional[str] = None
+    tags: Optional[list[str]] = None  # None = no change, [] = clear tags

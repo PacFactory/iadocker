@@ -9,6 +9,7 @@ import Search from './pages/Search';
 import Item from './pages/Item';
 import Downloads from './pages/Downloads';
 import Settings from './pages/Settings';
+import Bookmarks from './pages/Bookmarks';
 
 function App() {
     return (
@@ -19,6 +20,7 @@ function App() {
                     <Search path="/search" />
                     <Item path="/item/:identifier" />
                     <Downloads path="/downloads" />
+                    <Bookmarks path="/bookmarks" />
                     <Settings path="/settings" />
                 </Router>
             </Layout>

@@ -40,6 +40,12 @@ const ExternalIcon = () => (
     </svg>
 );
 
+const BookmarkIcon = ({ filled }) => (
+    <svg viewBox="0 0 24 24" fill={filled ? "currentColor" : "none"} stroke="currentColor" stroke-width="2" width="20" height="20">
+        <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
+    </svg>
+);
+
 const FolderIcon = () => (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
         <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
@@ -270,6 +276,10 @@ export default function Item({ identifier }) {
     const [fileType, setFileType] = useState('');
     const [showOriginalOnly, setShowOriginalOnly] = useState(false);
 
+    // Bookmark state
+    const [isBookmarked, setIsBookmarked] = useState(false);
+    const [bookmarkLoading, setBookmarkLoading] = useState(false);
+
     useEffect(() => {
         async function load() {
             setLoading(true);
@@ -284,6 +294,39 @@ export default function Item({ identifier }) {
         }
         load();
     }, [identifier]);
+
+    // Check bookmark status on load
+    useEffect(() => {
+        async function checkBookmark() {
+            try {
+                await api.getBookmark(identifier);
+                setIsBookmarked(true);
+            } catch {
+                setIsBookmarked(false);
+            }
+        }
+        checkBookmark();
+    }, [identifier]);
+
+    const toggleBookmark = async () => {
+        if (bookmarkLoading) return;
+        setBookmarkLoading(true);
+        try {
+            if (isBookmarked) {
+                await api.deleteBookmark(identifier);
+                setIsBookmarked(false);
+                addToast('Bookmark removed', 'success');
+            } else {
+                await api.createBookmark(identifier);
+                setIsBookmarked(true);
+                addToast('Bookmark added', 'success');
+            }
+        } catch (err) {
+            addToast('Failed to update bookmark', 'error');
+        } finally {
+            setBookmarkLoading(false);
+        }
+    };
 
     // Filter files
     const filteredFiles = useMemo(() => {
@@ -394,7 +437,7 @@ export default function Item({ identifier }) {
 
     return (
         <div>
-            <div style={{ display: 'flex', gap: 'var(--space-md)', marginBottom: 'var(--space-lg)' }}>
+            <div style={{ display: 'flex', gap: 'var(--space-md)', marginBottom: 'var(--space-lg)', flexWrap: 'wrap' }}>
                 <a href="/" class="btn btn-secondary">
                     <BackIcon /> Back to Search
                 </a>
@@ -406,6 +449,15 @@ export default function Item({ identifier }) {
                 >
                     <ExternalIcon /> View on Archive.org
                 </a>
+                <button
+                    class={`btn ${isBookmarked ? 'btn-primary' : 'btn-secondary'}`}
+                    onClick={toggleBookmark}
+                    disabled={bookmarkLoading}
+                    title={isBookmarked ? 'Remove bookmark' : 'Add bookmark'}
+                >
+                    <BookmarkIcon filled={isBookmarked} />
+                    {isBookmarked ? 'Bookmarked' : 'Bookmark'}
+                </button>
             </div>
 
             {/* Item header */}
