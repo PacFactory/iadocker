@@ -1,95 +1,60 @@
-const ALLOWED_TAGS = new Set([
-    'a',
-    'b',
-    'strong',
-    'i',
-    'em',
-    'p',
-    'br',
-    'ul',
-    'ol',
-    'li',
-    'code',
-    'pre',
-    'blockquote',
-    'div',
-    'span',
-    'hr',
-]);
+import DOMPurify from 'dompurify';
 
-const ALLOWED_ATTRS = new Set(['href', 'title', 'target', 'rel']);
-const SAFE_PROTOCOLS = new Set(['http:', 'https:', 'mailto:']);
+// Configure DOMPurify with safe defaults
+const PURIFY_CONFIG = {
+    ALLOWED_TAGS: [
+        'a', 'b', 'strong', 'i', 'em', 'p', 'br',
+        'ul', 'ol', 'li', 'code', 'pre', 'blockquote',
+        'div', 'span', 'hr',
+    ],
+    ALLOWED_ATTR: ['href', 'title', 'target', 'rel'],
+    ALLOW_DATA_ATTR: false,
+    ADD_ATTR: ['target', 'rel'],
+};
+
+// Hook to sanitize URLs and add safe link attributes
+if (typeof window !== 'undefined') {
+    DOMPurify.addHook('afterSanitizeAttributes', (node) => {
+        if (node.tagName === 'A') {
+            const href = node.getAttribute('href') || '';
+            // Only allow http, https, mailto protocols
+            if (href && !/^(https?:|mailto:)/i.test(href)) {
+                node.removeAttribute('href');
+            }
+            // Force safe link behavior for external links
+            if (node.hasAttribute('href')) {
+                node.setAttribute('target', '_blank');
+                node.setAttribute('rel', 'noopener noreferrer');
+            }
+        }
+    });
+}
 
 function normalizeInput(html) {
     if (html === null || html === undefined) return '';
     return String(html);
 }
 
-function getSafeHref(href) {
-    const trimmed = href.trim();
-    if (!trimmed) return null;
-    try {
-        const url = new URL(trimmed, window.location.origin);
-        if (!SAFE_PROTOCOLS.has(url.protocol)) return null;
-        return url.href;
-    } catch {
-        return null;
-    }
-}
-
 export function sanitizeDescription(html) {
     const source = normalizeInput(html);
     if (!source) return '';
 
-    if (typeof window === 'undefined' || typeof DOMParser === 'undefined') {
+    // SSR fallback: escape HTML
+    if (typeof window === 'undefined') {
         return source
             .replace(/&/g, '&amp;')
             .replace(/</g, '&lt;')
             .replace(/>/g, '&gt;');
     }
 
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(source, 'text/html');
-    const elements = Array.from(doc.body.querySelectorAll('*'));
-
-    for (const el of elements) {
-        if (!el.isConnected) continue;
-        const tag = el.tagName.toLowerCase();
-
-        if (!ALLOWED_TAGS.has(tag)) {
-            const textNode = doc.createTextNode(el.textContent || '');
-            el.replaceWith(textNode);
-            continue;
-        }
-
-        for (const attr of Array.from(el.attributes)) {
-            const name = attr.name.toLowerCase();
-            if (!ALLOWED_ATTRS.has(name)) {
-                el.removeAttribute(attr.name);
-            }
-        }
-
-        if (tag === 'a') {
-            const safeHref = getSafeHref(el.getAttribute('href') || '');
-            if (!safeHref) {
-                el.removeAttribute('href');
-                el.removeAttribute('target');
-                el.removeAttribute('rel');
-            } else {
-                el.setAttribute('href', safeHref);
-                el.setAttribute('target', '_blank');
-                el.setAttribute('rel', 'noopener noreferrer');
-            }
-        }
-    }
-
-    return doc.body.innerHTML;
+    return DOMPurify.sanitize(source, PURIFY_CONFIG);
 }
 
 export function plainTextDescription(html) {
     const source = normalizeInput(html);
     if (!source) return '';
 
+    // SSR fallback: strip tags with regex
     if (typeof window === 'undefined' || typeof DOMParser === 'undefined') {
         return source.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
     }
