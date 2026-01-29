@@ -1,13 +1,17 @@
 import asyncio
 import json
 import logging
+import multiprocessing
 import uuid
 from datetime import datetime
 from typing import Optional
 import os
+import shutil
+from pathlib import Path
 
 from app.models import Job, JobStatus, JobType
 from app.services.ia_service import IAService
+from app.services.download_worker import run_download_worker
 from app.config import settings
 from app.settings_defaults import DEFAULT_SETTINGS
 
@@ -25,6 +29,8 @@ class JobManager:
         self._download_subscribers: list[asyncio.Queue] = []
         self._running_downloads: set[str] = set()
         self._cancelled: set[str] = set()
+        self._download_processes: dict[str, multiprocessing.Process] = {}
+        self._mp_context = multiprocessing.get_context("spawn")
         self._ia_service = IAService()
         self._lock = asyncio.Lock()
         # Initialize to default - will be overridden by initialize_from_db()
@@ -204,15 +210,37 @@ class JobManager:
         # Use custom destdir if set, otherwise default
         destdir = job.destdir
         job_id = job.id
+        no_directories = download_options.get("no_directories", False)
+
+        base_dir = Path(destdir) if destdir else settings.download_path
+        try:
+            base_dir = base_dir.resolve()
+        except Exception:
+            base_dir = Path(destdir) if destdir else settings.download_path
+
+        staging_dir: Optional[Path] = None
+        staging_placeholders: set[str] = set()
+        process_started = False
+        cleanup_done = False
 
         def is_cancelled():
             """Check if job was cancelled - uses status as authoritative source."""
             return job_id in self._cancelled or job.status in TERMINAL_STATUSES
 
         async def cleanup_cancelled():
-            """Clean up _cancelled set on early exit to prevent leaks."""
+            nonlocal cleanup_done
+            if cleanup_done:
+                return
+            if process_started or staging_dir is not None:
+                await self._cleanup_cancelled_download(
+                    job,
+                    files,
+                    download_options,
+                    staging_dir=staging_dir,
+                )
             async with self._lock:
                 self._cancelled.discard(job_id)
+            cleanup_done = True
 
         # Wait if at max concurrent downloads - check cancellation while waiting
         while len(self._running_downloads) >= self._max_concurrent_downloads:
@@ -247,81 +275,180 @@ class JobManager:
         # Transition to RUNNING immediately after adding to running set (outside lock)
         await self._on_job_state_transition(job, JobStatus.RUNNING)
 
-        # Start progress monitor task
-        progress_task = asyncio.create_task(
-            self._monitor_progress(job, files, download_options)
-        )
+        progress_task: Optional[asyncio.Task] = None
+        process: Optional[multiprocessing.Process] = None
+        result_queue: Optional[multiprocessing.Queue] = None
+        had_exception = False
 
         try:
-            # Run download in thread pool (blocking I/O)
-            loop = asyncio.get_event_loop()
+            worker_destdir = destdir
+            progress_root: Optional[Path] = None
 
-            if files:
-                for filename in files:
-                    if is_cancelled():
-                        break
-                    success = await loop.run_in_executor(
-                        None,
-                        lambda f=filename: self._ia_service.download_file(
-                            job.identifier,
-                            f,
-                            destdir=destdir,
-                            ignore_existing=download_options.get("ignore_existing", True),
-                            checksum=download_options.get("checksum", False),
-                            retries=download_options.get("retries", 5),
-                            timeout=download_options.get("timeout"),
-                            no_directories=download_options.get("no_directories", False),
-                            no_change_timestamp=download_options.get("no_change_timestamp", False),
-                            on_the_fly=download_options.get("on_the_fly", False),
-                        )
-                    )
-                    if not success:
-                        raise Exception(f"Failed to download {filename}")
-            else:
-                success = await loop.run_in_executor(
-                    None,
-                    lambda: self._ia_service.download_item(
-                        job.identifier,
-                        glob=glob,
-                        format=format,
-                        destdir=destdir,
-                        ignore_existing=download_options.get("ignore_existing", True),
-                        checksum=download_options.get("checksum", False),
-                        retries=download_options.get("retries", 5),
-                        timeout=download_options.get("timeout"),
-                        no_directories=download_options.get("no_directories", False),
-                        no_change_timestamp=download_options.get("no_change_timestamp", False),
-                        source=download_options.get("source"),
-                        exclude_source=download_options.get("exclude_source"),
-                        on_the_fly=download_options.get("on_the_fly", False),
-                        exclude=download_options.get("exclude"),
-                    )
+            try:
+                staging_dir = self._create_staging_dir(base_dir, job_id)
+            except Exception as e:
+                raise RuntimeError(f"Failed to prepare staging directory: {e}") from e
+
+            if download_options.get("ignore_existing", True):
+                staging_placeholders = self._populate_staging_placeholders(
+                    staging_dir,
+                    base_dir,
+                    files,
+                    job.identifier,
+                    no_directories,
                 )
-                if not success:
-                    raise Exception("Download failed")
 
-            if not is_cancelled():
+            worker_destdir = str(staging_dir)
+            progress_root = staging_dir
+
+            # Start progress monitor task
+            progress_task = asyncio.create_task(
+                self._monitor_progress(job, files, download_options, download_root=progress_root)
+            )
+            payload = {
+                "identifier": job.identifier,
+                "files": files,
+                "glob": glob,
+                "format": format,
+                "destdir": worker_destdir,
+                "download_options": download_options,
+            }
+
+            if is_cancelled():
+                await cleanup_cancelled()
+                return
+
+            result_queue = self._mp_context.Queue()
+            process = self._mp_context.Process(
+                target=run_download_worker,
+                args=(payload, result_queue),
+                daemon=True,
+            )
+
+            async with self._lock:
+                self._download_processes[job_id] = process
+
+            if is_cancelled():
+                async with self._lock:
+                    self._download_processes.pop(job_id, None)
+                await cleanup_cancelled()
+                return
+
+            process.start()
+            process_started = True
+
+            while process.is_alive():
+                if is_cancelled():
+                    await self._terminate_process(process)
+                    await cleanup_cancelled()
+                    return
+                await asyncio.sleep(0.5)
+
+            try:
+                process.join(timeout=0)
+            except Exception:
+                pass
+
+            if is_cancelled():
+                await cleanup_cancelled()
+                return
+
+            result = None
+            if result_queue is not None:
+                try:
+                    result = result_queue.get_nowait()
+                except Exception:
+                    result = None
+
+            success = process.exitcode == 0
+            error_message = None
+            if result is not None:
+                success = result.get("success", success)
+                error_message = result.get("error")
+
+            if success:
+                if is_cancelled():
+                    await cleanup_cancelled()
+                    return
+
+                if staging_dir:
+                    loop = asyncio.get_event_loop()
+                    try:
+                        await loop.run_in_executor(
+                            None,
+                            self._finalize_staging_download_sync,
+                            staging_dir,
+                            base_dir,
+                            download_options.get("ignore_existing", True),
+                            staging_placeholders,
+                        )
+                    except Exception as e:
+                        job.error = f"Failed to finalize download: {e}"
+                        await self._on_job_state_transition(job, JobStatus.FAILED)
+                        return
+
                 job.progress = 100.0
                 await self._on_job_state_transition(job, JobStatus.COMPLETED)
+            else:
+                job.error = error_message or "Download failed"
+                await self._on_job_state_transition(job, JobStatus.FAILED)
 
         except Exception as e:
-            job.error = str(e)
-            await self._on_job_state_transition(job, JobStatus.FAILED)
+            had_exception = True
+            if not is_cancelled():
+                job.error = str(e)
+                await self._on_job_state_transition(job, JobStatus.FAILED)
+            else:
+                await cleanup_cancelled()
 
         finally:
             # Stop progress monitor
-            progress_task.cancel()
-            try:
-                await progress_task
-            except asyncio.CancelledError:
-                pass
+            if progress_task:
+                progress_task.cancel()
+                try:
+                    await progress_task
+                except asyncio.CancelledError:
+                    pass
+
+            if process and (is_cancelled() or had_exception):
+                await self._terminate_process(process)
+
+            if result_queue is not None:
+                try:
+                    result_queue.close()
+                    result_queue.join_thread()
+                except Exception:
+                    pass
+
+            if is_cancelled() and not cleanup_done:
+                await cleanup_cancelled()
+
+            if staging_dir and job.status == JobStatus.FAILED and not cleanup_done:
+                loop = asyncio.get_event_loop()
+                try:
+                    await loop.run_in_executor(None, self._cleanup_staging_dir, staging_dir)
+                except Exception:
+                    pass
+
+            if process is not None:
+                try:
+                    process.close()
+                except Exception:
+                    pass
 
             # Cleanup: remove from running set and cancelled set
             async with self._lock:
                 self._running_downloads.discard(job_id)
                 self._cancelled.discard(job_id)  # Cleanup to prevent set growth
+                self._download_processes.pop(job_id, None)
 
-    async def _monitor_progress(self, job: Job, files: Optional[list[str]], download_options: dict):
+    async def _monitor_progress(
+        self,
+        job: Job,
+        files: Optional[list[str]],
+        download_options: dict,
+        download_root: Optional[Path] = None,
+    ):
         """Monitor download progress by checking file sizes."""
         import time
 
@@ -329,8 +456,9 @@ class JobManager:
             no_directories = download_options.get("no_directories", False)
 
             # Determine download directory based on no_directories option
-            if job.destdir:
-                from pathlib import Path
+            if download_root:
+                base_dir = download_root
+            elif job.destdir:
                 base_dir = Path(job.destdir)
             else:
                 base_dir = settings.download_path
@@ -427,6 +555,176 @@ class JobManager:
         except Exception as e:
             logger.warning(f"Progress monitor error: {e}")
 
+    def _create_staging_dir(self, base_dir: Path, job_id: str) -> Path:
+        """Create a per-job staging directory under base_dir/.tmp."""
+        staging_dir = (base_dir / ".tmp" / f"job-{job_id}").resolve()
+        staging_dir.relative_to(base_dir.resolve())
+        staging_dir.mkdir(parents=True, exist_ok=True)
+        return staging_dir
+
+    def _populate_staging_placeholders(
+        self,
+        staging_dir: Path,
+        base_dir: Path,
+        files: Optional[list[str]],
+        identifier: str,
+        no_directories: bool,
+    ) -> set[str]:
+        """Create placeholder files in staging dir for existing files."""
+        placeholders: set[str] = set()
+        file_list = files
+        if file_list is None:
+            try:
+                item = self._ia_service.get_item(identifier)
+                if item and item.files:
+                    file_list = [f.name for f in item.files if f.name]
+            except Exception:
+                return placeholders
+
+        if not file_list:
+            return placeholders
+
+        target_root = base_dir if no_directories else base_dir / identifier
+        staging_root = staging_dir if no_directories else staging_dir / identifier
+
+        for filename in file_list:
+            target = self._safe_resolve_path(target_root, filename)
+            if not target or not target.exists():
+                continue
+            if not (target.is_file() or target.is_symlink()):
+                continue
+            placeholder_path = self._safe_resolve_path(staging_root, filename)
+            if not placeholder_path:
+                continue
+            try:
+                placeholder_path.parent.mkdir(parents=True, exist_ok=True)
+                if placeholder_path.exists() or placeholder_path.is_symlink():
+                    try:
+                        rel = placeholder_path.relative_to(staging_dir)
+                        placeholders.add(rel.as_posix())
+                    except Exception:
+                        pass
+                    continue
+                placeholder_path.touch(exist_ok=True)
+                try:
+                    rel = placeholder_path.relative_to(staging_dir)
+                    placeholders.add(rel.as_posix())
+                except Exception:
+                    pass
+            except Exception:
+                continue
+        return placeholders
+
+    def _finalize_staging_download_sync(
+        self,
+        staging_dir: Path,
+        base_dir: Path,
+        ignore_existing: bool,
+        skip_paths: Optional[set[str]] = None,
+    ):
+        """Move staged files into base_dir, skipping placeholders."""
+        skip_paths = skip_paths or set()
+        if not staging_dir.exists():
+            return
+
+        for root, _, filenames in os.walk(staging_dir):
+            for name in filenames:
+                src = Path(root) / name
+                if src.is_symlink():
+                    continue
+                try:
+                    rel = src.relative_to(staging_dir)
+                except Exception:
+                    continue
+                rel_key = rel.as_posix()
+                if rel_key in skip_paths:
+                    continue
+                dest = self._safe_resolve_path(base_dir, str(rel))
+                if not dest:
+                    continue
+                try:
+                    dest.parent.mkdir(parents=True, exist_ok=True)
+                    if dest.exists() and ignore_existing:
+                        continue
+                    os.replace(src, dest)
+                except Exception:
+                    continue
+
+        shutil.rmtree(staging_dir, ignore_errors=True)
+        tmp_root = staging_dir.parent
+        try:
+            if tmp_root.is_dir() and not any(tmp_root.iterdir()):
+                tmp_root.rmdir()
+        except Exception:
+            pass
+
+    def _cleanup_staging_dir(self, staging_dir: Path):
+        """Remove staging directory and its empty parent if possible."""
+        shutil.rmtree(staging_dir, ignore_errors=True)
+        tmp_root = staging_dir.parent
+        try:
+            if tmp_root.is_dir() and not any(tmp_root.iterdir()):
+                tmp_root.rmdir()
+        except Exception:
+            pass
+
+    def _safe_resolve_path(self, root: Path, relative: str) -> Optional[Path]:
+        """Resolve relative path safely within root, rejecting path traversal."""
+        try:
+            candidate = (root / relative).resolve()
+            candidate.relative_to(root.resolve())
+            return candidate
+        except Exception:
+            return None
+
+    async def _cleanup_cancelled_download(
+        self,
+        job: Job,
+        files: Optional[list[str]],
+        download_options: dict,
+        staging_dir: Optional[Path] = None,
+    ):
+        """Run cleanup in a thread to avoid blocking the event loop."""
+        loop = asyncio.get_event_loop()
+        if staging_dir:
+            await loop.run_in_executor(None, self._cleanup_staging_dir, staging_dir)
+            return
+
+    async def _wait_for_process_exit(self, process: multiprocessing.Process, timeout: float):
+        """Wait for a process to exit with a timeout without blocking the event loop."""
+        loop = asyncio.get_event_loop()
+        deadline = loop.time() + timeout
+        while loop.time() < deadline:
+            try:
+                if not process.is_alive():
+                    break
+            except (ValueError, AssertionError):
+                break
+            await asyncio.sleep(0.1)
+        try:
+            process.join(timeout=0)
+        except Exception:
+            pass
+
+    async def _terminate_process(self, process: Optional[multiprocessing.Process]):
+        """Terminate a process and wait briefly for it to exit."""
+        if not process:
+            return
+        try:
+            alive = process.is_alive()
+        except (ValueError, AssertionError):
+            return
+        if alive:
+            process.terminate()
+            await self._wait_for_process_exit(process, timeout=2.0)
+        try:
+            alive = process.is_alive()
+        except (ValueError, AssertionError):
+            return
+        if alive:
+            process.kill()
+            await self._wait_for_process_exit(process, timeout=2.0)
+
     def get_job(self, job_id: str) -> Optional[Job]:
         """Get a job by ID (memory only for active jobs)."""
         return self._jobs.get(job_id)
@@ -449,8 +747,13 @@ class JobManager:
         if not job or job.status in TERMINAL_STATUSES:
             return False
 
+        process: Optional[multiprocessing.Process] = None
         async with self._lock:
             self._cancelled.add(job_id)  # Set flag first
+            process = self._download_processes.get(job_id)
+
+        if process:
+            asyncio.create_task(self._terminate_process(process))
 
         # Call transition OUTSIDE lock
         await self._on_job_state_transition(job, JobStatus.CANCELLED)
